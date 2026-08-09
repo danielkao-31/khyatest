@@ -12,3 +12,48 @@ window.APP_RUNTIME_CONFIG = Object.freeze({
   expectedApiContractVersion: '1.2.0',
   assetVersion: '20260806-deployalign1'
 });
+
+/*
+ * my-page-cache1
+ * 首頁 Dashboard 已有 Player / GroupJourney 時，在進入「我的」前
+ * 填入既有 accountProfile / journey cache，避免重複 GAS read API。
+ * 僅在有效 dashboard cache 下作用；既有 invalidation / scope 判斷維持不變。
+ */
+document.addEventListener('click', function(event) {
+  const target = event && event.target && event.target.closest
+    ? event.target.closest('#goMyBtn, #navMyBtn')
+    : null;
+
+  if (!target) {
+    return;
+  }
+
+  if (
+    typeof isCacheValid_ !== 'function' ||
+    typeof getCache_ !== 'function' ||
+    typeof setCache_ !== 'function' ||
+    !isCacheValid_('dashboard')
+  ) {
+    return;
+  }
+
+  const dashboard = getCache_('dashboard');
+
+  if (!dashboard || typeof dashboard !== 'object') {
+    return;
+  }
+
+  if (!isCacheValid_('accountProfile') && dashboard.player) {
+    setCache_('accountProfile', {
+      player: dashboard.player
+    });
+  }
+
+  if (
+    !isCacheValid_('journey') &&
+    dashboard.journey &&
+    Object.prototype.hasOwnProperty.call(dashboard.journey, 'group')
+  ) {
+    setCache_('journey', dashboard.journey.group || null);
+  }
+}, true);
