@@ -57,3 +57,127 @@ document.addEventListener('click', function(event) {
     setCache_('journey', dashboard.journey.group || null);
   }
 }, true);
+
+/*
+ * task-group-gate1
+ * Social panel 是衍生快取；只有它顯示成員不足 2 人時，
+ * 才以既有 getMyVitalGroups 確認任務資格。後端資格驗證仍完整保留。
+ */
+(function installTaskGroupEligibilityConfirmation_() {
+  let checking = false;
+
+  document.addEventListener('click', function(event) {
+    const target = event && event.target;
+    const card = target && typeof target.closest === 'function'
+      ? target.closest('[data-practice], [data-weekly-task]')
+      : null;
+
+    if (!card || !card.closest('#homeView') || typeof state === 'undefined') {
+      return;
+    }
+
+    const dailyType = String(card.dataset.practice || '').trim();
+    const weeklyType = String(card.dataset.weeklyTask || '').trim();
+    const taskType = dailyType || weeklyType;
+    const player = state.currentPlayer || {};
+    const groupId = String(player.groupId || '').trim();
+    const memberCount = Number(state.homeGroupMemberCount || 0);
+    const enabled = state.homeGroupEnabled !== false;
+
+    if (!taskType || !groupId || !enabled || memberCount >= 2) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopImmediatePropagation();
+
+    if (checking) {
+      return;
+    }
+    checking = true;
+
+    if (typeof setLoading === 'function') {
+      setLoading(true, '確認活力組成員...');
+    }
+
+    callServer('getMyVitalGroups', player.playerId)
+      .then(function(res) {
+        if (!isSuccess(res)) {
+          const message = typeof getResponseError === 'function'
+            ? getResponseError(res, '無法確認活力組成員資料，請稍後再試。')
+            : '無法確認活力組成員資料，請稍後再試。';
+          if (typeof openInfoModal === 'function' && typeof escapeHtml === 'function') {
+            openInfoModal('需要活力組', '<div class="empty-card">' + escapeHtml(message) + '</div>');
+          }
+          return;
+        }
+
+        const groups = res && res.data && Array.isArray(res.data.groups)
+          ? res.data.groups
+          : [];
+        const group = groups.find(function(item) {
+          return String(item && item.groupId || '').trim() === groupId;
+        }) || null;
+
+        state.vitalGroups = groups;
+        if (typeof setCache_ === 'function') {
+          setCache_('groupInfo', { groups: groups });
+        }
+
+        if (!group) {
+          if (typeof openInfoModal === 'function') {
+            openInfoModal(
+              '需要活力組',
+              '<div class="empty-card">找不到目前活力組資料，請更新首頁後再試。</div>'
+            );
+          }
+          return;
+        }
+
+        const members = Array.isArray(group.members) ? group.members : [];
+        const confirmedCount = Math.max(
+          0,
+          Number(group.memberCount || members.length || 0)
+        );
+        const confirmedEnabled = group.enabled !== false;
+
+        state.homeGroupMemberCount = confirmedCount;
+        state.homeGroupEnabled = confirmedEnabled;
+        state.homeGroupStatusMessage = confirmedEnabled
+          ? ''
+          : '此活力組目前已停用，相關小組功能暫停使用。';
+
+        const countTarget = document.querySelector('#homeMemberCountText');
+        if (countTarget) {
+          countTarget.textContent = String(confirmedCount);
+        }
+
+        if (!confirmedEnabled || confirmedCount < 2) {
+          if (typeof ensureGroupFeatureReady === 'function') {
+            ensureGroupFeatureReady();
+          }
+          return;
+        }
+
+        if (dailyType && typeof openPracticeModal === 'function') {
+          openPracticeModal(dailyType);
+        } else if (weeklyType && typeof openWeeklyTaskModal === 'function') {
+          openWeeklyTaskModal(weeklyType);
+        }
+      })
+      .catch(function(error) {
+        const message = typeof getErrorMessage === 'function'
+          ? getErrorMessage(error)
+          : '無法確認活力組成員資料，請稍後再試。';
+        if (typeof openInfoModal === 'function' && typeof escapeHtml === 'function') {
+          openInfoModal('需要活力組', '<div class="empty-card">' + escapeHtml(message) + '</div>');
+        }
+      })
+      .finally(function() {
+        checking = false;
+        if (typeof setLoading === 'function') {
+          setLoading(false);
+        }
+      });
+  }, true);
+})();
