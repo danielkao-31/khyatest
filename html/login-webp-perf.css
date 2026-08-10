@@ -1,7 +1,11 @@
-/* login-webp1: lossless WebP overrides for initial login/home artwork. */
+/* login-webp1 + home-webp1: lossless WebP overrides for login/home artwork. */
 body {
   --asset-bg-mobile: url("../UI/app-bg-cute-v4.webp?v=20260808-loginwebp1");
   --asset-bg-desktop: url("../UI/app-bg-cute-v4.webp?v=20260808-loginwebp1");
   --asset-hero-mobile: url("../UI/hero-journey-cute-v4.webp?v=20260808-loginwebp1");
   --asset-hero-desktop: url("../UI/hero-journey-cute-v4.webp?v=20260808-loginwebp1");
+  --asset-journey-mobile: url("../UI/journey-map-cute-v4.webp?v=20260809-homewebp1");
+  --asset-journey-desktop: url("../UI/journey-map-cute-v4.webp?v=20260809-homewebp1");
+  --asset-game-camp: url("../UI/board-panel-cute-v4.webp?v=20260809-homewebp1");
+  --asset-game-panel: url("../UI/quest-panel-cute-v4.webp?v=20260809-homewebp1");
 }
