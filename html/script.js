@@ -547,7 +547,12 @@ const STORAGE_KEY = 'yct_current_player';
 
           const nextAttempt = attemptIndex + 1;
           if (nextAttempt >= TASK_WRITE_SYNC_RETRY_DELAYS_MS.length) {
-            setResultMessage('#homeMessage', '任務已儲存，點數將由系統自動同步。', true);
+            removePendingTaskScorePreview_(eventId);
+            setResultMessage(
+              '#homeMessage',
+              '點數尚未同步完成，已恢復正式點數；任務狀態維持「同步中」。',
+              false
+            );
             finishTaskWriteSyncTracking_(eventId);
             return;
           }
@@ -563,7 +568,12 @@ const STORAGE_KEY = 'yct_current_player';
           if (!current) return;
           const nextAttempt = Number(current.attempt || 0) + 1;
           if (nextAttempt >= TASK_WRITE_SYNC_RETRY_DELAYS_MS.length) {
-            setResultMessage('#homeMessage', '任務已儲存，點數將由系統自動同步。', true);
+            removePendingTaskScorePreview_(eventId);
+            setResultMessage(
+              '#homeMessage',
+              '點數尚未同步完成，已恢復正式點數；任務狀態維持「同步中」。',
+              false
+            );
             finishTaskWriteSyncTracking_(eventId);
             return;
           }
@@ -5111,18 +5121,22 @@ const STORAGE_KEY = 'yct_current_player';
       ['book', record.bookPursuit, '#homeBookStatus']
     ];
 
+    const recordPendingSync = Number(record.submittedCount || 0) > 0 &&
+      record.rewardCalculated === false;
+
     tasks.forEach(([type, value, homeStatus]) => {
       const done = toBool(value);
+      const pending = done && recordPendingSync;
       const status = $(homeStatus);
 
       if (status) {
-        status.textContent = done ? '已完成' : '未完成';
+        status.textContent = pending ? '同步中' : (done ? '已完成' : '未完成');
       }
 
       const homeButton = $('.quest-card[data-practice="' + type + '"]');
 
       if (homeButton) {
-        homeButton.classList.toggle('done', done);
+        homeButton.classList.toggle('done', done && !pending);
       }
     });
   }
@@ -5138,9 +5152,10 @@ const STORAGE_KEY = 'yct_current_player';
       return;
     }
 
-    const done = toBool(
-      (state.dailyRecord || {})[config.field]
-    );
+    const dailyRecord = state.dailyRecord || {};
+    const done = toBool(dailyRecord[config.field]);
+    const pendingSync = done && Number(dailyRecord.submittedCount || 0) > 0 &&
+      dailyRecord.rewardCalculated === false;
 
     state.selectedPracticeType = type;
 
@@ -5148,19 +5163,24 @@ const STORAGE_KEY = 'yct_current_player';
     $('#practiceModalDescription').textContent = config.description;
     $('#practiceModalReward').textContent = config.reward;
 
-    $('#practiceSubmitBtn').textContent = done
-      ? (TASK_PERFORMANCE_PROBE_ENABLED ? '防重測速' : '今日已完成')
-      : '確認完成';
+    $('#practiceSubmitBtn').textContent = pendingSync
+      ? '點數同步中'
+      : (done
+          ? (TASK_PERFORMANCE_PROBE_ENABLED ? '防重測速' : '今日已完成')
+          : '確認完成');
 
-    $('#practiceSubmitBtn').disabled = done && !TASK_PERFORMANCE_PROBE_ENABLED;
+    $('#practiceSubmitBtn').disabled = pendingSync ||
+      (done && !TASK_PERFORMANCE_PROBE_ENABLED);
 
     setResultMessage(
       '#practiceModalMessage',
-      done
-        ? (TASK_PERFORMANCE_PROBE_ENABLED
-            ? '防重測速只重送已完成狀態，不會新增任務或點數。'
-            : '這項任務今天已完成，系統不會重複計入積分。')
-        : '',
+      pendingSync
+        ? '任務已送出，等待後端點數同步完成；目前尚未視為正式完成。'
+        : (done
+            ? (TASK_PERFORMANCE_PROBE_ENABLED
+                ? '防重測速只重送已完成狀態，不會新增任務或點數。'
+                : '這項任務今天已完成，系統不會重複計入積分。')
+            : ''),
       false
     );
 
@@ -5318,19 +5338,23 @@ const STORAGE_KEY = 'yct_current_player';
       ]
     ];
 
+    const recordPendingSync = Number(record.submittedCount || 0) > 0 &&
+      record.rewardCalculated === false;
+
     rows.forEach(([type, value, statusSelector, buttonSelector]) => {
       const done = toBool(value);
+      const pending = done && recordPendingSync;
       const button = $(buttonSelector) ||
         $('[data-weekly-task="' + type + '"]');
       const status = $(statusSelector) ||
         (button ? button.querySelector('em') : null);
 
       if (status) {
-        status.textContent = done ? '已完成' : '未完成';
+        status.textContent = pending ? '同步中' : (done ? '已完成' : '未完成');
       }
 
       if (button) {
-        button.classList.toggle('done', done);
+        button.classList.toggle('done', done && !pending);
       }
     });
 
@@ -5353,9 +5377,10 @@ const STORAGE_KEY = 'yct_current_player';
       return;
     }
 
-    const done = toBool(
-      (state.weeklyTaskRecord || {})[config.field]
-    );
+    const weeklyRecord = state.weeklyTaskRecord || {};
+    const done = toBool(weeklyRecord[config.field]);
+    const pendingSync = done && Number(weeklyRecord.submittedCount || 0) > 0 &&
+      weeklyRecord.rewardCalculated === false;
 
     state.selectedWeeklyTaskType = type;
 
@@ -5363,19 +5388,24 @@ const STORAGE_KEY = 'yct_current_player';
     $('#weeklyTaskModalDescription').textContent = config.description;
     $('#weeklyTaskModalReward').textContent = config.reward;
 
-    $('#weeklyTaskSubmitBtn').textContent = done
-      ? (TASK_PERFORMANCE_PROBE_ENABLED ? '防重測速' : '本週已完成')
-      : '確認完成';
+    $('#weeklyTaskSubmitBtn').textContent = pendingSync
+      ? '點數同步中'
+      : (done
+          ? (TASK_PERFORMANCE_PROBE_ENABLED ? '防重測速' : '本週已完成')
+          : '確認完成');
 
-    $('#weeklyTaskSubmitBtn').disabled = done && !TASK_PERFORMANCE_PROBE_ENABLED;
+    $('#weeklyTaskSubmitBtn').disabled = pendingSync ||
+      (done && !TASK_PERFORMANCE_PROBE_ENABLED);
 
     setResultMessage(
       '#weeklyTaskModalMessage',
-      done
-        ? (TASK_PERFORMANCE_PROBE_ENABLED
-            ? '防重測速只重送已完成狀態，不會新增任務或點數。'
-            : '這項本週任務已完成，系統不會重複計入積分。')
-        : '',
+      pendingSync
+        ? '任務已送出，等待後端點數同步完成；目前尚未視為正式完成。'
+        : (done
+            ? (TASK_PERFORMANCE_PROBE_ENABLED
+                ? '防重測速只重送已完成狀態，不會新增任務或點數。'
+                : '這項本週任務已完成，系統不會重複計入積分。')
+            : ''),
       false
     );
 
