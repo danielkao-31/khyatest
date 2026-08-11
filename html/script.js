@@ -261,9 +261,22 @@ const STORAGE_KEY = 'yct_current_player';
   function replacePendingTaskScorePreview_(oldKey, newKey, delta) {
     oldKey = String(oldKey || '').trim();
     newKey = String(newKey || '').trim();
-    if (oldKey) delete state.pendingTaskScorePreviews[oldKey];
 
-    const normalized = normalizeTaskScorePreviewDelta_(delta);
+    /*
+     * submitDailyPractice / submitMeetingPractice 接受 Queue 事件時，目前後端
+     * 不回 optimisticDelta。此時必須把送出前依動態 taskConfig 建立的 local
+     * preview 原樣交接給 eventId，不能因為 response 沒有 delta 就把分數拿掉。
+     * 若未來後端明確提供 delta，仍以後端值為準。
+     */
+    const existing = oldKey && state.pendingTaskScorePreviews[oldKey]
+      ? normalizeTaskScorePreviewDelta_(state.pendingTaskScorePreviews[oldKey])
+      : null;
+    const hasServerDelta = !!delta && typeof delta === 'object';
+    const normalized = hasServerDelta
+      ? normalizeTaskScorePreviewDelta_(delta)
+      : (existing || normalizeTaskScorePreviewDelta_(null));
+
+    if (oldKey) delete state.pendingTaskScorePreviews[oldKey];
     if (newKey && (normalized.personalPoints || normalized.groupPoints)) {
       state.pendingTaskScorePreviews[newKey] = normalized;
     }
