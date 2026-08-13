@@ -9,6 +9,8 @@ const STORAGE_KEY = 'yct_current_player';
   const IMAGE_ASSET_VERSION = String(
     (window.APP_RUNTIME_CONFIG && window.APP_RUNTIME_CONFIG.assetVersion) || 'current'
   ).trim() || 'current';
+  const IMAGE_LOAD_TIMEOUT_MS = 8000;
+  const IMAGE_LOAD_MAX_RETRIES = 1;
   const IMAGE_FALLBACK_DATA_URL =
     'data:image/svg+xml;charset=UTF-8,' +
     encodeURIComponent(
@@ -815,8 +817,6 @@ const STORAGE_KEY = 'yct_current_player';
     prayerTimers: {},
     groupPostTimer: null,
     dismissedCycleAdvancePrompts: {},
-    imageLoadQueue: [],
-    activeImageLoads: 0,
     imageCache: {},
     businessDate: '',
     homeSyncToken: '',
@@ -1213,7 +1213,12 @@ const STORAGE_KEY = 'yct_current_player';
         return;
       }
 
-      setManagedImageSource_(img, url, img.dataset.imageKey || url);
+      const imageKey = img.dataset.imageKey || url;
+      const isImmediateAsset = /^chest\d{2}$/i.test(String(imageKey || ''));
+      setManagedImageSource_(img, url, imageKey, {
+        loading: isImmediateAsset ? 'eager' : (img.getAttribute('loading') || undefined),
+        priority: isImmediateAsset ? 'high' : undefined
+      });
     });
   }
 
@@ -1279,7 +1284,7 @@ const STORAGE_KEY = 'yct_current_player';
         console.warn('[image-load-failed]', {
           key: key || url,
           url: url,
-          retryCount: 2,
+          retryCount: IMAGE_LOAD_MAX_RETRIES,
           error: error && error.message ? error.message : String(error || '')
         });
         if (typeof options.onFallback === 'function') {
@@ -1339,19 +1344,25 @@ const STORAGE_KEY = 'yct_current_player';
 
     let retryCount = 0;
     let usingFallback = false;
+    let attemptSequence = 0;
 
     const applySource = () => {
       const sourceUrl = usingFallback ? fallbackUrl : url;
       const targetUrl = buildRetryImageUrl_(sourceUrl, retryCount);
+      const attemptId = ++attemptSequence;
+      let settled = false;
 
-      image.onload = () => {
-        image.dataset.managedLoadedUrl = sourceUrl;
-        image.classList.remove('hidden', 'managed-image-loading', 'managed-image-fallback');
-        placeholder.classList.add('hidden');
+      const finishAttempt = (handler) => {
+        if (settled || attemptId !== attemptSequence) return;
+        settled = true;
+        window.clearTimeout(timeoutId);
+        image.onload = null;
+        image.onerror = null;
+        handler();
       };
 
-      image.onerror = () => {
-        if (retryCount < 1) {
+      const handleFailure = (reason) => {
+        if (retryCount < IMAGE_LOAD_MAX_RETRIES) {
           retryCount += 1;
           window.setTimeout(applySource, 250);
           return;
@@ -1368,7 +1379,7 @@ const STORAGE_KEY = 'yct_current_player';
           key: key,
           url: sourceUrl,
           retryCount: retryCount,
-          error: 'avatar-load-failed'
+          error: reason
         });
         image.classList.add('hidden');
         image.removeAttribute('src');
@@ -1376,9 +1387,21 @@ const STORAGE_KEY = 'yct_current_player';
         placeholder.classList.remove('hidden');
       };
 
-      image.classList.add('managed-image-loading');
-      image.classList.remove('managed-image-fallback', 'hidden');
-      placeholder.classList.add('hidden');
+      image.onload = () => finishAttempt(() => {
+        image.dataset.managedLoadedUrl = sourceUrl;
+        image.classList.remove('hidden', 'managed-image-loading', 'managed-image-fallback');
+        placeholder.classList.add('hidden');
+      });
+
+      image.onerror = () => finishAttempt(() => handleFailure('avatar-load-failed'));
+
+      const timeoutId = window.setTimeout(() => {
+        finishAttempt(() => handleFailure('avatar-load-timeout'));
+      }, IMAGE_LOAD_TIMEOUT_MS);
+
+      image.classList.add('managed-image-loading', 'hidden');
+      image.classList.remove('managed-image-fallback');
+      placeholder.classList.remove('hidden');
       if (image.getAttribute('src') !== targetUrl) {
         image.src = targetUrl;
       }
@@ -1406,7 +1429,7 @@ const STORAGE_KEY = 'yct_current_player';
       return state.imageCache[cacheKey].promise;
     }
 
-    const promise = enqueueImageLoad_(() => loadImageWithRetry_(key, url, 0))
+    const promise = loadImageWithRetry_(key, url, 0)
       .then((loadedUrl) => {
         state.imageCache[cacheKey] = {
           status: 'loaded',
@@ -1428,45 +1451,13 @@ const STORAGE_KEY = 'yct_current_player';
     return promise;
   }
 
-  function enqueueImageLoad_(loader) {
-    return new Promise((resolve, reject) => {
-      state.imageLoadQueue.push({
-        loader: loader,
-        resolve: resolve,
-        reject: reject
-      });
-
-      runImageLoadQueue_();
-    });
-  }
-
-  function runImageLoadQueue_() {
-    const maxConcurrent = 5;
-
-    while (
-      state.activeImageLoads < maxConcurrent &&
-      state.imageLoadQueue.length
-    ) {
-      const task = state.imageLoadQueue.shift();
-      state.activeImageLoads += 1;
-
-      Promise.resolve()
-        .then(task.loader)
-        .then(task.resolve)
-        .catch(task.reject)
-        .finally(() => {
-          state.activeImageLoads = Math.max(0, state.activeImageLoads - 1);
-          runImageLoadQueue_();
-        });
-    }
-  }
 
   function loadImageWithRetry_(key, url, retryCount) {
     const targetUrl = buildRetryImageUrl_(url, retryCount);
 
     return loadSingleImage_(targetUrl)
       .catch((error) => {
-        if (retryCount >= 2) {
+        if (retryCount >= IMAGE_LOAD_MAX_RETRIES) {
           console.warn('[image-load-failed]', {
             key: key,
             url: url,
@@ -1499,15 +1490,25 @@ const STORAGE_KEY = 'yct_current_player';
   function loadSingleImage_(url) {
     return new Promise((resolve, reject) => {
       const img = new Image();
+      let settled = false;
 
-      img.onload = () => {
-        const decoded = img.decode ? img.decode() : Promise.resolve();
-
-        decoded
-          .catch(() => null)
-          .then(() => resolve(url));
+      const finish = (handler) => {
+        if (settled) return;
+        settled = true;
+        window.clearTimeout(timeoutId);
+        img.onload = null;
+        img.onerror = null;
+        handler();
       };
-      img.onerror = () => reject(new Error('圖片載入失敗'));
+
+      img.decoding = 'async';
+      img.onload = () => finish(() => resolve(url));
+      img.onerror = () => finish(() => reject(new Error('圖片載入失敗')));
+
+      const timeoutId = window.setTimeout(() => {
+        finish(() => reject(new Error('圖片載入逾時')));
+      }, IMAGE_LOAD_TIMEOUT_MS);
+
       img.src = url;
     });
   }
