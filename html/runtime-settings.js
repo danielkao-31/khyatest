@@ -8,7 +8,7 @@ window.APP_RUNTIME_CONFIG = Object.freeze({
   gasWebAppUrl: 'https://script.google.com/macros/s/AKfycbySdTUaZEq1MmhpU369sT8GEJqLZTNlHN0ZiEPBL0JjLvzDaAYHn9ymMUHQYzkDqKmD0g/exec',
   // 留空時管理後台沿用 gasWebAppUrl；有獨立管理部署時再填入其 /exec。
   adminGasWebAppUrl: '',
-  releaseVersion: 'v0.13.22-perf1-visualfix1-groupui1-deployalign1',
+  releaseVersion: 'v0.13.22-perf1',
   expectedApiContractVersion: '1.2.0',
-  assetVersion: '20260806-deployalign1'
+  assetVersion: '20260813-stableasset1'
 });

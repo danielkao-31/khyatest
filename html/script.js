@@ -6,7 +6,9 @@ const STORAGE_KEY = 'yct_current_player';
   const LOCAL_AVATAR_BASE_URL = ASSET_BASE_URL;
   const REMOTE_AVATAR_BASE_URL =
     'https://raw.githubusercontent.com/danielkao-31/khyatest/main';
-  const IMAGE_ASSET_VERSION = '20260801-v01322-visualfix1';
+  const IMAGE_ASSET_VERSION = String(
+    (window.APP_RUNTIME_CONFIG && window.APP_RUNTIME_CONFIG.assetVersion) || 'current'
+  ).trim() || 'current';
   const IMAGE_FALLBACK_DATA_URL =
     'data:image/svg+xml;charset=UTF-8,' +
     encodeURIComponent(
