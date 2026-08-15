@@ -497,12 +497,7 @@ const STORAGE_KEY = 'yct_current_player';
       const tracking = state.taskWriteSyncInFlight[eventId];
       if (!tracking) return;
       const attemptIndex = Number(tracking.attempt || 0);
-      const shouldProcess =
-        attemptIndex === 0 ||
-        attemptIndex === TASK_WRITE_SYNC_RETRY_DELAYS_MS.length - 1;
-      const action = shouldProcess
-        ? 'processTaskWriteEvent'
-        : 'getTaskWriteEventStatus';
+      const action = 'processTaskWriteEvent';
 
       callServer(action, {
         eventId,
