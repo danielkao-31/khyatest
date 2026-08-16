@@ -1538,10 +1538,10 @@ const STORAGE_KEY = 'yct_current_player';
     $('#homeJourneyNodes').addEventListener('click', openGroupJourneyListModal);
     $('#openChestCollectionBtn').addEventListener('click', openChestCollectionModal);
 
-    $('#homeMorningBtn').addEventListener('click', () => openPracticeModal('morning'));
-    $('#homeBibleBtn').addEventListener('click', () => openPracticeModal('bible'));
-    $('#homePrayerPracticeBtn').addEventListener('click', () => openPracticeModal('prayer'));
-    $('#homeBookBtn').addEventListener('click', () => openPracticeModal('book'));
+    $('#homeMorningBtn').addEventListener('click', () => submitHomePracticeDirect_('morning'));
+    $('#homeBibleBtn').addEventListener('click', () => submitHomePracticeDirect_('bible'));
+    $('#homePrayerPracticeBtn').addEventListener('click', () => submitHomePracticeDirect_('prayer'));
+    $('#homeBookBtn').addEventListener('click', () => submitHomePracticeDirect_('book'));
 
     /*
      * 每日操練獨立頁按鈕已不在目前前台版面中。
@@ -1573,7 +1573,20 @@ const STORAGE_KEY = 'yct_current_player';
       const type = String(button.dataset.weeklyTask || '').trim();
 
       if (WEEKLY_TASK_CONFIG[type]) {
-        button.addEventListener('click', () => openWeeklyTaskModal(type));
+        const isHomeTaskButton = [
+          'homeOutreachVisitBtn',
+          'homeWeeklySmallGroupBtn',
+          'homeWeeklyPrayerMeetingBtn',
+          'homeWeeklyLordDayBtn'
+        ].indexOf(String(button.id || '')) >= 0;
+
+        button.addEventListener('click', () => {
+          if (isHomeTaskButton) {
+            submitHomeWeeklyTaskDirect_(type);
+            return;
+          }
+          openWeeklyTaskModal(type);
+        });
       }
     });
 
@@ -5123,6 +5136,29 @@ const STORAGE_KEY = 'yct_current_player';
     });
   }
 
+  function submitHomePracticeDirect_(type) {
+    const config = PRACTICE_CONFIG[type];
+
+    if (!config) {
+      return;
+    }
+
+    if (!ensureGroupFeatureReady()) {
+      return;
+    }
+
+    const dailyRecord = state.dailyRecord || {};
+    const done = toBool(dailyRecord[config.field]);
+
+    if (done) {
+      openPracticeModal(type);
+      return;
+    }
+
+    state.selectedPracticeType = type;
+    submitPracticeModal({ directHome: true });
+  }
+
   function openPracticeModal(type) {
     const config = PRACTICE_CONFIG[type];
 
@@ -5163,7 +5199,9 @@ const STORAGE_KEY = 'yct_current_player';
     openModal('practiceModal');
   }
 
-  function submitPracticeModal() {
+  function submitPracticeModal(options) {
+    const directHome = !!(options && options.directHome === true);
+    const messageTarget = directHome ? '#homeMessage' : '#practiceModalMessage';
     const config = PRACTICE_CONFIG[state.selectedPracticeType];
 
     if (!config || !state.currentPlayer) {
@@ -5201,7 +5239,7 @@ const STORAGE_KEY = 'yct_current_player';
           removePendingTaskScorePreview_(localPreviewKey);
           settlePendingMutationRequest_('daily-practice', payload.requestId, res);
           setResultMessage(
-            '#practiceModalMessage',
+            messageTarget,
             getResponseError(res, '儲存失敗')
           );
           return;
@@ -5226,7 +5264,9 @@ const STORAGE_KEY = 'yct_current_player';
         const performanceMessage = res.data.processingPending
           ? formatTaskQueueAcceptedMessage_(res.data.performance, taskRequestStartedAt)
           : formatTaskPerformanceMessage_(res.data.performance, taskRequestStartedAt);
-        closeModal('practiceModal');
+        if (!directHome) {
+          closeModal('practiceModal');
+        }
         setResultMessage('#homeMessage', performanceMessage, true);
         if (res.data.processingPending && res.data.eventId) {
           continueTaskWriteProcessing_(
@@ -5242,7 +5282,7 @@ const STORAGE_KEY = 'yct_current_player';
       })
       .catch((error) => {
         removePendingTaskScorePreview_(localPreviewKey);
-        setResultMessage('#practiceModalMessage', getErrorMessage(error));
+        setResultMessage(messageTarget, getErrorMessage(error));
       })
       .finally(() => {
         setLoading(false);
@@ -5338,6 +5378,29 @@ const STORAGE_KEY = 'yct_current_player';
     }
   }
 
+  function submitHomeWeeklyTaskDirect_(type) {
+    const config = WEEKLY_TASK_CONFIG[type];
+
+    if (!config) {
+      return;
+    }
+
+    if (!ensureGroupFeatureReady()) {
+      return;
+    }
+
+    const weeklyRecord = state.weeklyTaskRecord || {};
+    const done = toBool(weeklyRecord[config.field]);
+
+    if (done) {
+      openWeeklyTaskModal(type);
+      return;
+    }
+
+    state.selectedWeeklyTaskType = type;
+    submitWeeklyTaskModal({ directHome: true });
+  }
+
   function openWeeklyTaskModal(type) {
     const config = WEEKLY_TASK_CONFIG[type];
 
@@ -5378,7 +5441,9 @@ const STORAGE_KEY = 'yct_current_player';
     openModal('weeklyTaskModal');
   }
 
-  function submitWeeklyTaskModal() {
+  function submitWeeklyTaskModal(options) {
+    const directHome = !!(options && options.directHome === true);
+    const messageTarget = directHome ? '#homeMessage' : '#weeklyTaskModalMessage';
     const config = WEEKLY_TASK_CONFIG[state.selectedWeeklyTaskType];
 
     if (!config || !state.currentPlayer) {
@@ -5418,7 +5483,7 @@ const STORAGE_KEY = 'yct_current_player';
           removePendingTaskScorePreview_(localPreviewKey);
           settlePendingMutationRequest_('meeting-practice', payload.requestId, res);
           setResultMessage(
-            '#weeklyTaskModalMessage',
+            messageTarget,
             getResponseError(res, '儲存失敗')
           );
           return;
@@ -5443,7 +5508,9 @@ const STORAGE_KEY = 'yct_current_player';
         const performanceMessage = res.data.processingPending
           ? formatTaskQueueAcceptedMessage_(res.data.performance, taskRequestStartedAt)
           : formatTaskPerformanceMessage_(res.data.performance, taskRequestStartedAt);
-        closeModal('weeklyTaskModal');
+        if (!directHome) {
+          closeModal('weeklyTaskModal');
+        }
         setResultMessage('#homeMessage', performanceMessage, true);
         if (res.data.processingPending && res.data.eventId) {
           continueTaskWriteProcessing_(
@@ -5459,7 +5526,7 @@ const STORAGE_KEY = 'yct_current_player';
       })
       .catch((error) => {
         removePendingTaskScorePreview_(localPreviewKey);
-        setResultMessage('#weeklyTaskModalMessage', getErrorMessage(error));
+        setResultMessage(messageTarget, getErrorMessage(error));
       })
       .finally(() => {
         setLoading(false);
