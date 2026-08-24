@@ -6983,9 +6983,258 @@ function clearPrayerAutoScroll(selector) {
       });
   }
 
+  function getIsoWeekStartDateText_(weekKey) {
+    const match = String(weekKey || '').trim().match(/^(\d{4})-W(\d{2})$/);
+    if (!match) return '';
+
+    const isoYear = Number(match[1]);
+    const isoWeek = Number(match[2]);
+    if (isoWeek < 1 || isoWeek > 53) return '';
+
+    const januaryFourth = new Date(Date.UTC(isoYear, 0, 4));
+    const januaryFourthIsoDay = januaryFourth.getUTCDay() || 7;
+    const monday = new Date(Date.UTC(
+      isoYear,
+      0,
+      4 - januaryFourthIsoDay + 1 + (isoWeek - 1) * 7
+    ));
+
+    return monday.toISOString().slice(0, 10);
+  }
+
+  function getFootprintCompletedCount_(row) {
+    row = row || {};
+    return [
+      row.morningCompleted,
+      row.bibleCompleted,
+      row.prayerCompleted,
+      row.readingCompleted
+    ].filter(toBool).length;
+  }
+
+  function buildCurrentTaskFootprintDashboard_(dashboard) {
+    const source = dashboard || {};
+    const today = String(source.today || getTaipeiBusinessDate_()).trim();
+    const currentWeekKey = String(
+      source.currentWeekKey || getTaipeiIsoWeekKey_()
+    ).trim();
+    const monthKey = String(
+      source.monthly && source.monthly.monthKey || today.slice(0, 7)
+    ).trim();
+    const daily = (Array.isArray(source.daily) ? source.daily : [])
+      .map((row) => Object.assign({}, row));
+    const weekly = (Array.isArray(source.weekly) ? source.weekly : [])
+      .map((row) => Object.assign({}, row));
+    const monthly = Object.assign({
+      monthKey: monthKey,
+      completedDays: 0,
+      bibleDays: 0,
+      prayerDays: 0,
+      morningDays: 0,
+      meetingCount: 0,
+      visitCount: 0,
+      longestStreak: 0,
+      totalScore: 0
+    }, source.monthly || {});
+
+    const dailyIndex = daily.findIndex((row) =>
+      String(row.recordDate || '').trim() === today
+    );
+    const formalToday = dailyIndex >= 0
+      ? Object.assign({}, daily[dailyIndex])
+      : {
+          recordDate: today,
+          morningCompleted: false,
+          bibleCompleted: false,
+          prayerCompleted: false,
+          readingCompleted: false,
+          completedCount: 0,
+          dailyScore: 0,
+          streakStatus: '',
+          hasChest: false,
+          hasSpecialTask: false
+        };
+    const displayToday = Object.assign({}, formalToday);
+    const dailyRecord = state.dailyRecord || {};
+    const dailyRecordDate = String(dailyRecord.recordDate || today).trim();
+
+    if (dailyRecordDate === today) {
+      displayToday.morningCompleted =
+        toBool(formalToday.morningCompleted) || toBool(dailyRecord.morningRevival);
+      displayToday.bibleCompleted =
+        toBool(formalToday.bibleCompleted) || toBool(dailyRecord.bibleReading);
+      displayToday.prayerCompleted =
+        toBool(formalToday.prayerCompleted) || toBool(dailyRecord.prayer);
+      displayToday.readingCompleted =
+        toBool(formalToday.readingCompleted) || toBool(dailyRecord.bookPursuit);
+    }
+
+    const formalDailyCount = getFootprintCompletedCount_(formalToday);
+    const displayDailyCount = getFootprintCompletedCount_(displayToday);
+    const newlyVisibleDailyScore = [
+      ['bibleCompleted', 'bible'],
+      ['prayerCompleted', 'prayer'],
+      ['readingCompleted', 'book']
+    ].reduce((total, item) => {
+      if (!toBool(formalToday[item[0]]) && toBool(displayToday[item[0]])) {
+        return total + Math.max(0, Number(
+          PRACTICE_CONFIG[item[1]] && PRACTICE_CONFIG[item[1]].score || 0
+        ));
+      }
+      return total;
+    }, 0);
+
+    displayToday.completedCount = displayDailyCount;
+    displayToday.dailyScore = Math.max(
+      Number(formalToday.dailyScore || 0),
+      Number(formalToday.dailyScore || 0) + newlyVisibleDailyScore
+    );
+    displayToday.streakStatus = displayDailyCount >= 4
+      ? 'FULL'
+      : (displayDailyCount > 0 ? 'PARTIAL' : String(formalToday.streakStatus || ''));
+
+    if (dailyIndex >= 0) {
+      daily[dailyIndex] = displayToday;
+    } else if (displayDailyCount > 0) {
+      daily.unshift(displayToday);
+    }
+    daily.sort((left, right) =>
+      String(right.recordDate || '').localeCompare(String(left.recordDate || ''))
+    );
+
+    if (today.slice(0, 7) === monthKey) {
+      if (formalDailyCount === 0 && displayDailyCount > 0) {
+        monthly.completedDays = Number(monthly.completedDays || 0) + 1;
+      }
+      if (!toBool(formalToday.bibleCompleted) && toBool(displayToday.bibleCompleted)) {
+        monthly.bibleDays = Number(monthly.bibleDays || 0) + 1;
+      }
+      if (!toBool(formalToday.prayerCompleted) && toBool(displayToday.prayerCompleted)) {
+        monthly.prayerDays = Number(monthly.prayerDays || 0) + 1;
+      }
+      if (!toBool(formalToday.morningCompleted) && toBool(displayToday.morningCompleted)) {
+        monthly.morningDays = Number(monthly.morningDays || 0) + 1;
+      }
+      monthly.totalScore = Number(monthly.totalScore || 0) + newlyVisibleDailyScore;
+      if (displayDailyCount > 0) {
+        monthly.longestStreak = Math.max(1, Number(monthly.longestStreak || 0));
+      }
+    }
+
+    const weeklyIndex = weekly.findIndex((row) =>
+      String(row.weekKey || '').trim() === currentWeekKey
+    );
+    const formalWeek = weeklyIndex >= 0
+      ? Object.assign({}, weekly[weeklyIndex])
+      : {
+          weekKey: currentWeekKey,
+          completedDays: 0,
+          morningDays: 0,
+          bibleDays: 0,
+          prayerDays: 0,
+          readingDays: 0,
+          groupMeetingCompleted: false,
+          prayerMeetingCompleted: false,
+          lordDayCompleted: false,
+          visitCompleted: false,
+          weeklyScore: 0,
+          longestStreak: 0,
+          chestCount: 0,
+          specialTaskCount: 0
+        };
+    const displayWeek = Object.assign({}, formalWeek);
+
+    if (formalDailyCount === 0 && displayDailyCount > 0) {
+      displayWeek.completedDays = Number(formalWeek.completedDays || 0) + 1;
+    }
+    if (!toBool(formalToday.morningCompleted) && toBool(displayToday.morningCompleted)) {
+      displayWeek.morningDays = Number(formalWeek.morningDays || 0) + 1;
+    }
+    if (!toBool(formalToday.bibleCompleted) && toBool(displayToday.bibleCompleted)) {
+      displayWeek.bibleDays = Number(formalWeek.bibleDays || 0) + 1;
+    }
+    if (!toBool(formalToday.prayerCompleted) && toBool(displayToday.prayerCompleted)) {
+      displayWeek.prayerDays = Number(formalWeek.prayerDays || 0) + 1;
+    }
+    if (!toBool(formalToday.readingCompleted) && toBool(displayToday.readingCompleted)) {
+      displayWeek.readingDays = Number(formalWeek.readingDays || 0) + 1;
+    }
+    displayWeek.weeklyScore = Number(formalWeek.weeklyScore || 0) + newlyVisibleDailyScore;
+    if (displayDailyCount > 0) {
+      displayWeek.longestStreak = Math.max(1, Number(formalWeek.longestStreak || 0));
+    }
+
+    const weeklyRecord = state.weeklyTaskRecord || {};
+    const weeklyRecordKey = String(weeklyRecord.weekKey || currentWeekKey).trim();
+    let newlyVisibleMeetingCount = 0;
+    let newlyVisibleVisitCount = 0;
+    let newlyVisibleMeetingScore = 0;
+
+    if (weeklyRecordKey === currentWeekKey) {
+      [
+        ['groupMeetingCompleted', 'smallGroup', 'smallGroup', true],
+        ['prayerMeetingCompleted', 'prayerMeeting', 'prayerMeeting', true],
+        ['lordDayCompleted', 'lordDayMeeting', 'lordDayMeeting', true],
+        ['visitCompleted', 'outreachVisit', 'outreachVisit', false]
+      ].forEach((item) => {
+        const footprintField = item[0];
+        const recordField = item[1];
+        const configKey = item[2];
+        const personalScore = item[3];
+        const before = toBool(formalWeek[footprintField]);
+        const after = before || toBool(weeklyRecord[recordField]);
+        displayWeek[footprintField] = after;
+
+        if (!before && after) {
+          if (footprintField === 'visitCompleted') {
+            newlyVisibleVisitCount += 1;
+          } else {
+            newlyVisibleMeetingCount += 1;
+          }
+          if (personalScore) {
+            newlyVisibleMeetingScore += Math.max(0, Number(
+              WEEKLY_TASK_CONFIG[configKey] && WEEKLY_TASK_CONFIG[configKey].score || 0
+            ));
+          }
+        }
+      });
+    }
+
+    displayWeek.weeklyScore += newlyVisibleMeetingScore;
+    const hasCurrentWeekDisplay =
+      Number(displayWeek.completedDays || 0) > 0 ||
+      toBool(displayWeek.groupMeetingCompleted) ||
+      toBool(displayWeek.prayerMeetingCompleted) ||
+      toBool(displayWeek.lordDayCompleted) ||
+      toBool(displayWeek.visitCompleted);
+
+    if (weeklyIndex >= 0) {
+      weekly[weeklyIndex] = displayWeek;
+    } else if (hasCurrentWeekDisplay) {
+      weekly.unshift(displayWeek);
+    }
+    weekly.sort((left, right) =>
+      String(right.weekKey || '').localeCompare(String(left.weekKey || ''))
+    );
+
+    if (getIsoWeekStartDateText_(currentWeekKey).slice(0, 7) === monthKey) {
+      monthly.meetingCount = Number(monthly.meetingCount || 0) + newlyVisibleMeetingCount;
+      monthly.visitCount = Number(monthly.visitCount || 0) + newlyVisibleVisitCount;
+    }
+
+    return Object.assign({}, source, {
+      today: today,
+      currentWeekKey: currentWeekKey,
+      monthly: monthly,
+      daily: daily,
+      weekly: weekly
+    });
+  }
+
   function showFootprintDashboard_(dashboard) {
-    openInfoModal('我的同行足跡', renderFootprintDashboardHtml_(dashboard || {}));
-    bindFootprintDayButtons_(dashboard || {});
+    const displayDashboard = buildCurrentTaskFootprintDashboard_(dashboard || {});
+    openInfoModal('我的同行足跡', renderFootprintDashboardHtml_(displayDashboard));
+    bindFootprintDayButtons_(displayDashboard);
   }
 
   function renderFootprintDashboardHtml_(dashboard) {
