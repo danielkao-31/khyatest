@@ -1,5 +1,5 @@
 const ADMIN_STORAGE_KEY = 'yct_admin_token';
-    const state = {token:'',tab:'overview',loadingDepth:0,players:[],groups:[],groupPosts:[],groupPostNextPageToken:'',groupPostHasMore:false,cycles:[],playerCycles:[],cycleMemberships:[],cycleGroups:[],currentCycle:null,prayers:[],prayerNextPageToken:'',prayerHasMore:false,adminLogs:[],rewardLogs:[],adminLogNextPageToken:'',rewardLogNextPageToken:'',groupRewardLogNextPageToken:'',adminLogHasMore:false,rewardLogHasMore:false,groupRewardLogHasMore:false,activityAnalysis:null,rewardAnalysis:null,chests:[],chestClaims:[],chestClaimNextPageToken:'',chestClaimHasMore:false,systemAnnouncements:[],specialTasks:[],selectedSpecialTaskId:'',specialTaskResults:null,specialTaskCsvText:'',specialTaskCsvPreview:null,migration:null,fix12Repairs:null,archiveMaintenance:null,settings:[],settingsHealth:null};
+    const state = {token:'',tab:'overview',loadingDepth:0,players:[],groups:[],groupPosts:[],groupPostNextPageToken:'',groupPostHasMore:false,cycles:[],playerCycles:[],cycleMemberships:[],cycleGroups:[],currentCycle:null,adminLogs:[],rewardLogs:[],adminLogNextPageToken:'',rewardLogNextPageToken:'',groupRewardLogNextPageToken:'',adminLogHasMore:false,rewardLogHasMore:false,groupRewardLogHasMore:false,activityAnalysis:null,rewardAnalysis:null,chests:[],chestClaims:[],chestClaimNextPageToken:'',chestClaimHasMore:false,systemAnnouncements:[],specialTasks:[],selectedSpecialTaskId:'',specialTaskResults:null,specialTaskCsvText:'',specialTaskCsvPreview:null,migration:null,fix12Repairs:null,archiveMaintenance:null,settings:[],settingsHealth:null};
     const $ = (s) => document.querySelector(s);
     const $$ = (s) => [...document.querySelectorAll(s)];
     const USER_APP_SYNC_SIGNAL_KEY = 'yct_app_sync_signal';
@@ -77,15 +77,11 @@ const ADMIN_STORAGE_KEY = 'yct_admin_token';
       $('#groupPostSearch').addEventListener('input', renderGroupPosts);
       $('#groupPostStatusFilter').addEventListener('change', () => loadGroupPosts(true));
       $('#loadMoreGroupPostsBtn').addEventListener('click', loadMoreGroupPosts);
-      $('#prayerSearch').addEventListener('input', renderPrayers);
-      $('#prayerStatusFilter').addEventListener('change', () => loadPrayers(true));
-      $('#loadMorePrayersBtn').addEventListener('click', () => loadPrayers(false));
       $('#loadMoreAdminLogsBtn').addEventListener('click', loadMoreAdminLogs);
       $('#loadMoreRewardLogsBtn').addEventListener('click', loadMoreRewardLogs);
       $('#playersBody').addEventListener('click', handlePlayerAction);
       $('#groupsBody').addEventListener('click', handleGroupAction);
       $('#groupPostsBody').addEventListener('click', handleGroupPostAction);
-      $('#prayersBody').addEventListener('click', handlePrayerAction);
       $('#chestsList').addEventListener('click', handleChestAction);
       $('#chestsList').addEventListener('change', handleChestRewardTypeChange);
       $('#chestRewardClaimsBody').addEventListener('click', handleChestRewardClaimAction);
@@ -183,7 +179,7 @@ const ADMIN_STORAGE_KEY = 'yct_admin_token';
           $$('.tab-btn').forEach((b) => {
             b.classList.toggle('active', b.dataset.tab === 'settings');
           });
-          ['overview','players','groups','groupPosts','cycles','prayers','activityLogs','rewardLogs','chests','systemAnnouncements','specialTasks','migration','settings'].forEach((name) => {
+          ['overview','players','groups','groupPosts','cycles','activityLogs','rewardLogs','chests','systemAnnouncements','specialTasks','migration','settings'].forEach((name) => {
             $('#' + name + 'Tab').classList.toggle('hidden', name !== 'settings');
           });
         } else {
@@ -218,7 +214,7 @@ const ADMIN_STORAGE_KEY = 'yct_admin_token';
         b.classList.toggle('active',b.dataset.tab === tab);
       });
 
-      ['overview','players','groups','groupPosts','cycles','prayers','activityLogs','rewardLogs','chests','systemAnnouncements','specialTasks','migration','settings'].forEach((name) => {
+      ['overview','players','groups','groupPosts','cycles','activityLogs','rewardLogs','chests','systemAnnouncements','specialTasks','migration','settings'].forEach((name) => {
         $('#' + name + 'Tab').classList.toggle('hidden',name !== tab);
       });
 
@@ -232,7 +228,6 @@ const ADMIN_STORAGE_KEY = 'yct_admin_token';
         groups:loadGroups,
         groupPosts:loadGroupPosts,
         cycles:loadCycles,
-        prayers:loadPrayers,
         activityLogs:loadActivityLogs,
         rewardLogs:loadRewardLogs,
         chests:loadChests,
@@ -268,8 +263,7 @@ const ADMIN_STORAGE_KEY = 'yct_admin_token';
 
         $('#overviewMeta').textContent =
           '本週：' + (stats.currentWeekKey || '-') +
-          '｜未設定出生年 ' + number(stats.unsetAgePlayers) +
-          '｜代禱開放中 ' + number(stats.openPrayerRequests);
+          '｜未設定出生年 ' + number(stats.unsetAgePlayers);
 
         renderMiniList('#recentAdminLogs',recentAdminLogs,(r) => ({
           title:r.adminAction + '｜' + r.targetType,
@@ -278,8 +272,7 @@ const ADMIN_STORAGE_KEY = 'yct_admin_token';
         }));
 
         renderMiniList('#attentionList',[
-          {title:'未設定出生年',note:'目前 ' + number(stats.unsetAgePlayers) + ' 位',time:''},
-          {title:'代禱開放中',note:'目前 ' + number(stats.openPrayerRequests) + ' 筆',time:''}
+          {title:'未設定出生年',note:'目前 ' + number(stats.unsetAgePlayers) + ' 位',time:''}
         ],(r) => r);
 
         showMessage('#overviewMessage','總覽已更新','success');
@@ -486,100 +479,6 @@ const ADMIN_STORAGE_KEY = 'yct_admin_token';
         loadGroups(true);
         showMessage('#groupsMessage','新邀請碼：' + res.data.inviteCode,'success');
       }).catch((err) => showMessage('#groupsMessage',errorMessage(err),'error'))
-        .finally(() => setLoading(false));
-    }
-
-    function loadPrayers(force){
-      if(state.prayers.length && !force && !state.prayerHasMore) return renderPrayers();
-
-      if(force){
-        state.prayers = [];
-        state.prayerNextPageToken = '';
-        state.prayerHasMore = false;
-      }
-
-      setLoading(true,'讀取代禱...');
-      callServer('adminGetPrayerRequests',state.token,{
-        pageToken: state.prayerNextPageToken,
-        pageSize: 100,
-        status: $('#prayerStatusFilter').value
-      }).then((res) => {
-        if(!isSuccess(res)) return showMessage('#prayersMessage',responseError(res,'讀取代禱失敗'),'error');
-
-        const rows = res.data.requests || [];
-        state.prayers = force ? rows : state.prayers.concat(rows);
-        state.prayerNextPageToken = String(res.data.nextPageToken || '');
-        state.prayerHasMore = !!res.data.hasMore;
-        $('#loadMorePrayersBtn').classList.toggle('hidden',!state.prayerHasMore);
-        renderPrayers();
-        showMessage(
-          '#prayersMessage',
-          '已讀取 ' + state.prayers.length + ' 筆代禱事項' +
-            (state.prayerHasMore ? '，尚有下一頁' : ''),
-          'success'
-        );
-      }).catch((err) => showMessage('#prayersMessage',errorMessage(err),'error'))
-        .finally(() => setLoading(false));
-    }
-
-    function renderPrayers(){
-      const key = normalize($('#prayerSearch').value);
-      const status = $('#prayerStatusFilter').value;
-
-      const rows = state.prayers.filter((r) => {
-        const matched = !key || normalize([
-          r.title,
-          r.content,
-          r.ownerName,
-          r.groupName,
-          r.status,
-          r.visibility
-        ].join(' ')).includes(key);
-
-        return matched && (status === 'all' || r.status === status);
-      });
-
-      $('#prayersBody').innerHTML = rows.length ? rows.map((r) => {
-        return '<tr>' +
-          '<td><div class="cell-main"><strong>' + esc(r.title) + '</strong><small>' + esc(truncate(r.content,90)) + '</small></div></td>' +
-          '<td>' + esc(r.ownerName || '-') + '</td>' +
-          '<td>' + esc(r.groupName || '-') + '</td>' +
-          '<td><span class="pill ' + esc(r.status) + '">' + esc(r.status) + '</span></td>' +
-          '<td>' + esc(r.visibility || '-') + '</td>' +
-          '<td>已代禱 ' + number(r.responseCount) + ' 人</td>' +
-          '<td>' + esc(r.createdAt || '-') + '</td>' +
-          '<td><div class="row-actions">' +
-            prayerButton(r,'open','恢復') +
-            prayerButton(r,'closed','關閉') +
-          '</div></td>' +
-        '</tr>';
-      }).join('') : '<tr><td colspan="8">沒有符合條件的代禱事項</td></tr>';
-    }
-
-    function prayerButton(r,status,label){
-      const color = status === 'closed' ? 'amber' : 'green';
-      return '<button class="btn small ' + color + '" data-action="prayer-status" data-request-id="' + esc(r.requestId) + '" data-status="' + status + '"' + (r.status === status ? ' disabled' : '') + '>' + label + '</button>';
-    }
-
-    function handlePrayerAction(e){
-      const b = e.target.closest('button[data-action]');
-      if(!b || b.dataset.action !== 'prayer-status') return;
-
-      updatePrayerStatus(b.dataset.requestId,b.dataset.status);
-    }
-
-    function updatePrayerStatus(requestId,status){
-      if(!confirm('確定要把代禱狀態改為 ' + status + '？')) return;
-
-      setLoading(true,'更新代禱狀態...');
-      callServer('adminUpdatePrayerStatus',state.token,{requestId,status}).then((res) => {
-        if(!isSuccess(res)) return showMessage('#prayersMessage',responseError(res,'更新失敗'),'error');
-
-        state.prayers = [];
-        state.prayerNextPageToken = '';
-        state.prayerHasMore = false;
-        loadPrayers(true);
-      }).catch((err) => showMessage('#prayersMessage',errorMessage(err),'error'))
         .finally(() => setLoading(false));
     }
 

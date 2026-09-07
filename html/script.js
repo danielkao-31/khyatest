@@ -32,7 +32,6 @@ const STORAGE_KEY = 'yct_current_player';
       journeyDesktop: ASSET_BASE_URL + '/UI/journey-map-cute-v4.png',
       gameCamp: ASSET_BASE_URL + '/UI/board-panel-cute-v4.png',
       gamePanel: ASSET_BASE_URL + '/UI/quest-panel-cute-v4.png',
-      iconPrayerLink: ASSET_BASE_URL + '/UI/icon-prayer-link.png',
       iconGrowth: ASSET_BASE_URL + '/UI/icon-growth.png',
       systemAnnouncement: ASSET_BASE_URL + '/Cute_Icons/Cute_Icon_07.png',
       specialTaskInProgress: ASSET_BASE_URL + '/Cute_Icons/Cute_Icon_01.png',
@@ -61,8 +60,6 @@ const STORAGE_KEY = 'yct_current_player';
     'getPlayerMessageCenter',
     'getMyVitalGroups',
     'getMyFootprintDashboard',
-    'getPrayerCarousel',
-    'getMyPrayerRequests',
     'getPlayerProfile',
     'getGroupJourney',
     'getGroupJourneyList',
@@ -87,13 +84,6 @@ const STORAGE_KEY = 'yct_current_player';
     'submitMeetingPractice',
     'processTaskWriteEvent',
     'getTaskWriteEventStatus',
-    'searchPrayerRequests',
-    'createPrayerRequest',
-    'getPrayerRequestDetail',
-    'respondPrayerRequest',
-    'getMyPrayerRequestDetail',
-    'updatePrayerRequest',
-    'closePrayerRequest',
     'claimPlayerChestReward',
     'advancePlayerCycle'
   ];
@@ -111,8 +101,6 @@ const STORAGE_KEY = 'yct_current_player';
     chestSummary: 2 * 60 * 1000,
     chestCollection: 2 * 60 * 1000,
     chestSettingsForPlayer: 5 * 60 * 1000,
-    prayerList: 60 * 1000,
-    myPrayers: 60 * 1000,
     accountProfile: 3 * 60 * 1000,
     groupInfo: 3 * 60 * 1000
   };
@@ -581,8 +569,8 @@ const STORAGE_KEY = 'yct_current_player';
     'suppressPlayerMessageToday', 'updateMyAccount', 'updateMyPassword',
     'createVitalGroup', 'joinVitalGroupByInviteCode', 'switchPrimaryVitalGroup',
     'transferVitalGroupOwnership', 'leaveVitalGroup', 'createGroupPost', 'updateGroupPost', 'deleteGroupPost',
-    'submitDailyPractice', 'submitMeetingPractice', 'processTaskWriteEvent', 'createPrayerRequest',
-    'respondPrayerRequest', 'updatePrayerRequest', 'closePrayerRequest',
+    'submitDailyPractice', 'submitMeetingPractice', 'processTaskWriteEvent', 
+      
     'claimPlayerChestReward', 'advancePlayerCycle'
   ]);
   const PENDING_MUTATION_TTL_MS = 24 * 60 * 60 * 1000;
@@ -751,7 +739,6 @@ const STORAGE_KEY = 'yct_current_player';
     dailyRecord: null,
     weeklyTaskRecord: null,
     groupJourney: null,
-    homePrayerItems: [],
     homeGroupPosts: [],
     myGroupPost: null,
     homeGroupMemberCount: 0,
@@ -767,9 +754,6 @@ const STORAGE_KEY = 'yct_current_player';
     messageCenterSuppressionFlushInFlight: new Set(),
     messageCenterSuppressionRetryAttempts: new Map(),
     messageCenterSuppressionRetryTimer: null,
-    prayerCarouselItems: [],
-    explorePrayerItems: [],
-    myPrayerItems: [],
     vitalGroups: [],
     selectedPracticeType: '',
     selectedWeeklyTaskType: '',
@@ -781,23 +765,16 @@ const STORAGE_KEY = 'yct_current_player';
       personalPoints: 0,
       groupPoints: 0
     },
-    pendingPrayerResponseRequestIds: {},
     pendingGroupCreateRequestId: '',
     pendingGroupCreateSignature: '',
     pendingGroupPostCreateRequestId: '',
     pendingGroupPostCreateSignature: '',
-    pendingPrayerCreateRequestId: '',
-    pendingPrayerCreateSignature: '',
-    selectedPrayer: null,
-    selectedMyPrayerDetail: null,
-    selectedPrayerForEdit: null,
     selectedChestDetail: null,
     pendingConfirm: null,
     registrationAreaOptions: [],
     registerAvatar: null,
     avatarModal: null,
     editingGroupPostId: '',
-    prayerTimers: {},
     groupPostTimer: null,
     dismissedCycleAdvancePrompts: {},
     imageCache: {},
@@ -1530,8 +1507,6 @@ const STORAGE_KEY = 'yct_current_player';
       refreshDashboard(true);
     });
     $('#logoutBtn').addEventListener('click', openLogoutConfirm);
-
-    $('#goPrayerBtn').addEventListener('click', () => showView('prayer'));
     $('#goMyBtn').addEventListener('click', () => showView('my'));
 
     $('#openGroupJourneyBtn').addEventListener('click', openGroupJourneyListModal);
@@ -1595,21 +1570,6 @@ const STORAGE_KEY = 'yct_current_player';
     if (weeklyTaskSubmitButton) {
       weeklyTaskSubmitButton.addEventListener('click', submitWeeklyTaskModal);
     }
-
-    $('#refreshPrayerBtn').addEventListener('click', () => {
-      invalidateCache_('prayerList');
-      loadPrayerPage(true);
-    });
-    $('#openPrayerExploreBtn').addEventListener('click', openPrayerExploreModal);
-    $('#openPrayerCreateBtn').addEventListener('click', openPrayerCreateModal);
-    $('#openPrayerMineBtn').addEventListener('click', openMyPrayerModal);
-
-    $('#prayerCreateForm').addEventListener('submit', submitPrayerCreate);
-    $('#searchPrayerBtn').addEventListener('click', searchPrayerRequests);
-    $('#prayerOwnerKeyword').addEventListener('keydown', handlePrayerSearchEnter);
-    $('#prayerKeyword').addEventListener('keydown', handlePrayerSearchEnter);
-
-    $('#prayerEditForm').addEventListener('submit', submitPrayerEdit);
     $('#openGroupPostModalBtn').addEventListener('click', openGroupPostModal);
     $('#homeGroupPostForm').addEventListener('submit', submitHomeGroupPost);
     $('#cancelGroupPostEditBtn').addEventListener('click', resetGroupPostEditor);
@@ -1628,12 +1588,6 @@ const STORAGE_KEY = 'yct_current_player';
 
       confirmDeleteMyGroupPost(deleteButton.dataset.deleteGroupPost || '');
     });
-    $('#prayerCarousel').addEventListener('click', handleDynamicPrayerOpen);
-    $('#prayerExploreList').addEventListener('click', handleDynamicPrayerOpen);
-    $('#myPrayerList').addEventListener('click', handleMyPrayerListClick);
-
-    $('#prayerDetailActions').addEventListener('click', handlePrayerDetailAction);
-    $('#myPrayerDetailActions').addEventListener('click', handleMyPrayerDetailAction);
 
     $('#myAvatarBtn').addEventListener('click', openAvatarModal);
     $('#openAvatarBtn').addEventListener('click', openAvatarModal);
@@ -1658,7 +1612,6 @@ const STORAGE_KEY = 'yct_current_player';
     $('#confirmModalSubmitBtn').addEventListener('click', executePendingConfirm);
 
     $('#navHomeBtn').addEventListener('click', () => showView('home'));
-    $('#navPrayerBtn').addEventListener('click', () => showView('prayer'));
     $('#navMyBtn').addEventListener('click', () => showView('my'));
 
     $$('[data-theme-choice]').forEach((button) => {
@@ -1845,7 +1798,6 @@ const STORAGE_KEY = 'yct_current_player';
     [
       'authView',
       'homeView',
-      'prayerView',
       'myView'
     ].forEach((id) => {
       $('#' + id).classList.add('hidden');
@@ -1865,7 +1817,6 @@ const STORAGE_KEY = 'yct_current_player';
 
     const viewId = {
       home: 'homeView',
-      prayer: 'prayerView',
       my: 'myView'
     }[name] || 'homeView';
 
@@ -1879,9 +1830,6 @@ const STORAGE_KEY = 'yct_current_player';
       refreshDashboard(true);
     }
 
-    if (name === 'prayer' && !options.skipDataLoad) {
-      loadPrayerPage(true);
-    }
 
     if (name === 'my' && !options.skipDataLoad) {
       refreshMyPage();
@@ -1891,7 +1839,6 @@ const STORAGE_KEY = 'yct_current_player';
   function setNavActive(name) {
     const map = {
       home: '#navHomeBtn',
-      prayer: '#navPrayerBtn',
       my: '#navMyBtn'
     };
 
@@ -5568,1138 +5515,6 @@ const STORAGE_KEY = 'yct_current_player';
     }).join('');
   }
 
-  function loadPrayerPage(showLoading) {
-    if (isCacheValid_('prayerList')) {
-      const cached = getCache_('prayerList') || {};
-      state.prayerCarouselItems = cached.items || [];
-
-      $('#prayerCarouselStatusText').textContent = '';
-      renderPrayerCarousel(
-        '#prayerCarousel',
-        state.prayerCarouselItems,
-        'prayer'
-      );
-      return;
-    }
-
-    if (showLoading) {
-      setLoading(true, '讀取代禱牆...');
-    }
-
-    loadOnce_('prayerList', () => callServer(
-      'getPrayerCarousel',
-      state.currentPlayer.playerId,
-      'prayer'
-    ))
-      .then((res) => {
-        if (!isSuccess(res)) {
-          setResultMessage(
-            '#prayerMessage',
-            getResponseError(res, '讀取代禱事項失敗')
-          );
-          return;
-        }
-
-        state.prayerCarouselItems = res.data.items || [];
-        setCache_('prayerList', {
-          items: state.prayerCarouselItems
-        });
-
-        $('#prayerCarouselStatusText').textContent = '';
-
-        renderPrayerCarousel(
-          '#prayerCarousel',
-          state.prayerCarouselItems,
-          'prayer'
-        );
-      })
-      .catch((error) => {
-        setResultMessage('#prayerMessage', getErrorMessage(error));
-      })
-      .finally(() => {
-        if (showLoading) {
-          setLoading(false);
-        }
-      });
-  }
-
-  function renderPrayerCarousel(selector, items, location) {
-  const target = $(selector);
-
-  if (!target) {
-    return;
-  }
-
-  clearPrayerAutoScroll(selector);
-
-  items = Array.isArray(items) ? items : [];
-
-  const visibleCount = items.length;
-  const densityClass = visibleCount === 0
-    ? 'is-empty'
-    : (visibleCount === 1 ? 'is-single' : 'is-many');
-
-  target.classList.remove('is-empty', 'is-single', 'is-many');
-  target.classList.add(densityClass);
-
-  if (!visibleCount) {
-    target.innerHTML =
-      '<div class="empty-card">目前沒有可見的代禱事項</div>';
-    return;
-  }
-
-  if (selector === '#prayerCarousel') {
-    const pageSize = 4;
-    const pages = [];
-
-    for (let index = 0; index < items.length; index += pageSize) {
-      pages.push(items.slice(index, index + pageSize));
-    }
-
-    target.innerHTML = pages.map((pageItems, pageIndex) => {
-      return [
-        '<div class="prayer-flip-page ' +
-          (pageIndex === 0 ? 'active' : 'standby') +
-          '" data-prayer-page="' + pageIndex + '">',
-
-        pageItems.map((request) => {
-          return [
-            '<button type="button" class="prayer-carousel-card prayer-flip-card"',
-            ' data-prayer-open="' + escapeHtml(request.requestId) + '"',
-            ' data-prayer-source="' + location + '">',
-
-            '<div class="prayer-inline-line">',
-            '<span class="prayer-owner">' +
-              escapeHtml(request.ownerDisplayName || '同伴') +
-            '</span>',
-
-            '<span class="prayer-date">' +
-              escapeHtml(request.createdShortDate || '') +
-            '</span>',
-
-            '<strong>★' +
-              escapeHtml(request.title || '代禱事項') +
-            '</strong>',
-
-            '<span>查看</span>',
-            '</div>',
-            '</button>'
-          ].join('');
-        }).join(''),
-
-        '</div>'
-      ].join('');
-    }).join('');
-
-    setupPrayerAutoScroll(selector);
-    return;
-  }
-
-  target.innerHTML = items.map((request) => {
-    return [
-      '<button type="button" class="prayer-carousel-card"',
-      ' data-prayer-open="' + escapeHtml(request.requestId) + '"',
-      ' data-prayer-source="' + location + '">',
-
-      '<div class="prayer-inline-line">',
-      '<span class="prayer-owner">' +
-        escapeHtml(request.ownerDisplayName || '同伴') +
-      '</span>',
-
-      '<span class="prayer-date">' +
-        escapeHtml(request.createdShortDate || '') +
-      '</span>',
-
-      '<strong>主題：' +
-        escapeHtml(request.title || '代禱事項') +
-      '</strong>',
-
-      '<span>查看</span>',
-      '</div>',
-      '</button>'
-    ].join('');
-  }).join('');
-
-  setupPrayerAutoScroll(selector);
-}
-
-function setupPrayerAutoScroll(selector) {
-  const target = $(selector);
-
-  clearPrayerAutoScroll(selector);
-
-  if (!target) {
-    return;
-  }
-
-  if (selector === '#prayerCarousel') {
-    const pages = Array.from(
-      target.querySelectorAll('.prayer-flip-page')
-    );
-
-    if (pages.length < 2) {
-      return;
-    }
-
-    const timerState = {
-      index: 0,
-      isFlipping: false,
-      interval: null,
-      transitionTimer: null
-    };
-
-    timerState.interval = window.setInterval(() => {
-      if (!document.body.contains(target)) {
-        clearPrayerAutoScroll(selector);
-        return;
-      }
-
-      if (timerState.isFlipping) {
-        return;
-      }
-
-      const nextIndex = (timerState.index + 1) % pages.length;
-
-      flipPrayerCarouselPage(
-        pages,
-        timerState.index,
-        nextIndex,
-        timerState,
-        selector
-      );
-    }, 4200);
-
-    state.prayerTimers[selector] = timerState;
-    return;
-  }
-
-  if (target.children.length < 2) {
-    return;
-  }
-
-  let index = 0;
-
-  state.prayerTimers[selector] = window.setInterval(() => {
-    if (!document.body.contains(target)) {
-      clearPrayerAutoScroll(selector);
-      return;
-    }
-
-    index = (index + 1) % target.children.length;
-
-    const child = target.children[index];
-
-    target.scrollTo({
-      top: child.offsetTop - target.offsetTop,
-      behavior: 'smooth'
-    });
-  }, 3800);
-}
-
-function flipPrayerCarouselPage(
-  pages,
-  currentIndex,
-  nextIndex,
-  timerState,
-  selector
-) {
-  const currentPage = pages[currentIndex];
-  const nextPage = pages[nextIndex];
-
-  if (!currentPage || !nextPage) {
-    return;
-  }
-
-  timerState.isFlipping = true;
-
-  pages.forEach((page) => {
-    page.classList.remove(
-      'active',
-      'standby',
-      'incoming',
-      'outgoing'
-    );
-    page.classList.add('standby');
-  });
-
-  currentPage.classList.remove('standby');
-  currentPage.classList.add('outgoing');
-
-  nextPage.classList.remove('standby');
-  nextPage.classList.add('incoming');
-
-  void nextPage.offsetWidth;
-
-  timerState.transitionTimer = window.setTimeout(() => {
-    if (!document.body.contains(nextPage)) {
-      clearPrayerAutoScroll(selector);
-      return;
-    }
-
-    pages.forEach((page, pageIndex) => {
-      page.classList.remove(
-        'active',
-        'standby',
-        'incoming',
-        'outgoing'
-      );
-
-      if (pageIndex === nextIndex) {
-        page.classList.add('active');
-      } else {
-        page.classList.add('standby');
-      }
-    });
-
-    timerState.index = nextIndex;
-    timerState.isFlipping = false;
-    timerState.transitionTimer = null;
-  }, 680);
-}
-
-function clearPrayerAutoScroll(selector) {
-  const timer = state.prayerTimers[selector];
-
-  if (!timer) {
-    return;
-  }
-
-  if (typeof timer === 'object') {
-    if (timer.interval) {
-      window.clearInterval(timer.interval);
-    }
-
-    if (timer.transitionTimer) {
-      window.clearTimeout(timer.transitionTimer);
-    }
-  } else {
-    window.clearInterval(timer);
-  }
-
-  delete state.prayerTimers[selector];
-}
-
-  function handleDynamicPrayerOpen(event) {
-    const button = event.target.closest('[data-prayer-open]');
-
-    if (!button) {
-      return;
-    }
-
-    openPrayerDetail(button.dataset.prayerOpen);
-  }
-
-  function openPrayerExploreModal() {
-    $('#prayerOwnerKeyword').value = '';
-    $('#prayerKeyword').value = '';
-    $('#prayerVisibilityFilter').value = 'all';
-    $('#prayerSortMode').value = 'groupFirst';
-    $('#prayerExploreMeta').textContent = '';
-
-    $('#prayerExploreList').innerHTML =
-      '<div class="empty-card">讀取代禱事項中...</div>';
-
-    openModal('prayerExploreModal');
-    searchPrayerRequests();
-  }
-
-  function handlePrayerSearchEnter(event) {
-    if (event.key === 'Enter') {
-      event.preventDefault();
-      searchPrayerRequests();
-    }
-  }
-
-  function searchPrayerRequests() {
-    if (!state.currentPlayer) {
-      return;
-    }
-
-    const payload = {
-      playerId: state.currentPlayer.playerId,
-      ownerKeyword: $('#prayerOwnerKeyword').value.trim(),
-      keyword: $('#prayerKeyword').value.trim(),
-      visibilityFilter: $('#prayerVisibilityFilter').value,
-      sortMode: $('#prayerSortMode').value,
-      maxResults: 100
-    };
-
-    setLoading(true, '搜尋代禱事項...');
-
-    callServer('searchPrayerRequests', payload)
-      .then((res) => {
-        if (!isSuccess(res)) {
-          $('#prayerExploreList').innerHTML =
-            '<div class="empty-card">' +
-              escapeHtml(getResponseError(res, '搜尋失敗')) +
-            '</div>';
-          return;
-        }
-
-        state.explorePrayerItems = res.data.rows || [];
-
-        $('#prayerExploreMeta').textContent =
-          '共 ' +
-          Number(res.data.totalCount || 0) +
-          ' 筆可見事項';
-
-        $('#prayerExploreList').innerHTML =
-          renderPrayerListCards(
-            state.explorePrayerItems,
-            false
-          );
-      })
-      .catch((error) => {
-        $('#prayerExploreList').innerHTML =
-          '<div class="empty-card">' +
-            escapeHtml(getErrorMessage(error)) +
-          '</div>';
-      })
-      .finally(() => {
-        setLoading(false);
-      });
-  }
-
-  function openPrayerCreateModal() {
-    if (!ensureGroupFeatureReady()) {
-      return;
-    }
-
-    $('#prayerTitle').value = '';
-    $('#prayerContent').value = '';
-    $('#prayerVisibility').value = 'group';
-
-    setResultMessage('#prayerCreateMessage', '', false);
-    openModal('prayerCreateModal');
-  }
-
-  function submitPrayerCreate(event) {
-    event.preventDefault();
-
-    const prayerSignature = [
-      $('#prayerTitle').value.trim(),
-      $('#prayerContent').value.trim(),
-      $('#prayerVisibility').value
-    ].join('\u0001');
-    state.pendingPrayerCreateSignature = prayerSignature;
-    state.pendingPrayerCreateRequestId = getPendingMutationRequestId_(
-      'prayer-create', prayerSignature
-    );
-    const payload = {
-      playerId: state.currentPlayer.playerId,
-      title: $('#prayerTitle').value.trim(),
-      content: $('#prayerContent').value.trim(),
-      visibility: $('#prayerVisibility').value,
-      requestId: state.pendingPrayerCreateRequestId || createClientRequestId_()
-    };
-    state.pendingPrayerCreateRequestId = payload.requestId;
-
-    if (!payload.title || !payload.content) {
-      setResultMessage(
-        '#prayerCreateMessage',
-        !payload.title
-          ? '請輸入代禱標題'
-          : '請輸入代禱內容'
-      );
-      return;
-    }
-
-    if (payload.title.length > 10) {
-      setResultMessage('#prayerCreateMessage', '代禱標題最多 10 個字');
-      return;
-    }
-
-    if (payload.content.length > 100) {
-      setResultMessage('#prayerCreateMessage', '代禱內容最多 100 個字');
-      return;
-    }
-
-    setLoading(true, '發出代禱事項...');
-
-    callServer('createPrayerRequest', payload)
-      .then((res) => {
-        if (!isSuccess(res)) {
-          settlePendingMutationRequest_(
-            'prayer-create', state.pendingPrayerCreateRequestId, res
-          );
-          setResultMessage(
-            '#prayerCreateMessage',
-            getResponseError(res, '發出失敗')
-          );
-          return;
-        }
-
-        closeModal('prayerCreateModal');
-        clearPendingMutationRequestId_(
-          'prayer-create', state.pendingPrayerCreateRequestId
-        );
-        state.pendingPrayerCreateRequestId = '';
-        state.pendingPrayerCreateSignature = '';
-
-        invalidateByRule_('prayerContentChanged');
-        loadPrayerPage(false);
-      })
-      .catch((error) => {
-        setResultMessage('#prayerCreateMessage', getErrorMessage(error));
-      })
-      .finally(() => {
-        setLoading(false);
-      });
-  }
-
-  function openMyPrayerModal() {
-    $('#myPrayerMeta').textContent = '';
-
-    if (isCacheValid_('myPrayers')) {
-      openModal('myPrayerModal');
-      loadMyPrayerRequests();
-      return;
-    }
-
-    $('#myPrayerList').innerHTML =
-      '<div class="empty-card">讀取中...</div>';
-
-    openModal('myPrayerModal');
-    loadMyPrayerRequests();
-  }
-
-  function loadMyPrayerRequests() {
-    if (isCacheValid_('myPrayers')) {
-      const cached = getCache_('myPrayers') || {};
-      state.myPrayerItems = cached.rows || [];
-      $('#myPrayerMeta').textContent = cached.metaText || '';
-      $('#myPrayerList').innerHTML =
-        renderMyPrayerRows(state.myPrayerItems);
-      return;
-    }
-
-    setLoading(true, '讀取我的代禱事項...');
-
-    loadOnce_('myPrayers', () => callServer(
-      'getMyPrayerRequests',
-      state.currentPlayer.playerId
-    ))
-      .then((res) => {
-        if (!isSuccess(res)) {
-          $('#myPrayerList').innerHTML =
-            '<div class="empty-card">' +
-              escapeHtml(getResponseError(res, '讀取失敗')) +
-            '</div>';
-          return;
-        }
-
-        state.myPrayerItems = res.data.rows || [];
-
-        $('#myPrayerMeta').textContent =
-          '共 ' +
-          Number(res.data.totalCount || 0) +
-          ' 筆我發出的代禱事項';
-
-        $('#myPrayerList').innerHTML =
-          renderMyPrayerRows(state.myPrayerItems);
-        setCache_('myPrayers', {
-          rows: state.myPrayerItems,
-          metaText: $('#myPrayerMeta').textContent
-        });
-      })
-      .catch((error) => {
-        $('#myPrayerList').innerHTML =
-          '<div class="empty-card">' +
-            escapeHtml(getErrorMessage(error)) +
-          '</div>';
-      })
-      .finally(() => {
-        setLoading(false);
-      });
-  }
-
-  function renderPrayerListCards(items, isMine) {
-    if (!items.length) {
-      return '<div class="empty-card">' +
-        (
-          isMine
-            ? '目前沒有你發出的代禱事項'
-            : '目前沒有符合條件的代禱事項'
-        ) +
-        '</div>';
-    }
-
-    return items.map((request) => {
-      const openAttribute = isMine
-        ? 'data-my-prayer-open'
-        : 'data-prayer-open';
-
-      return [
-        '<article class="prayer-list-card game-prayer-row">',
-        '<span class="prayer-owner">' +
-          escapeHtml(request.ownerDisplayName || '同伴') +
-        '</span>',
-        '<span class="prayer-date">' +
-          escapeHtml(request.createdShortDate || '') +
-        '</span>',
-        '<h3>★' + escapeHtml(request.title || '') + '</h3>',
-        '<button type="button" ' +
-          openAttribute +
-          '="' +
-          escapeHtml(request.requestId || '') +
-        '">',
-        isMine ? '查看管理' : '查看事項',
-        '</button>',
-        '</article>'
-      ].join('');
-    }).join('');
-  }
-
-  function renderMyPrayerRows(items) {
-    if (!items.length) {
-      return '<div class="empty-card">目前沒有你發出的代禱事項</div>';
-    }
-
-    return items.map((request) => {
-      const requestId = escapeHtml(request.requestId || '');
-      const dateText = escapeHtml(request.createdShortDate || '');
-      const titleText = escapeHtml(request.title || '');
-      const prayedCount = Number(request.responseCount || request.prayedCount || 0);
-      const canEdit = request.canEdit !== false;
-      const canClose = request.canClose !== false;
-
-      return [
-        '<article class="my-prayer-row">',
-        '<span class="my-prayer-date">' + dateText + '</span>',
-        '<strong class="my-prayer-title">' + titleText + '</strong>',
-        '<span class="my-prayer-count">已代禱 ' +
-          prayedCount +
-          ' 人</span>',
-        '<div class="my-prayer-actions">',
-        '<button class="mini-outline-btn" type="button" data-my-prayer-edit="' +
-          requestId +
-          '"' +
-          (canEdit ? '' : ' disabled') +
-          '>編輯</button>',
-        '<button class="mini-outline-btn danger-outline-btn" type="button" data-my-prayer-close="' +
-          requestId +
-          '"' +
-          (canClose ? '' : ' disabled') +
-          '>收回</button>',
-        '</div>',
-        '</article>'
-      ].join('');
-    }).join('');
-  }
-
-  function handleMyPrayerListClick(event) {
-    const editButton = event.target.closest('[data-my-prayer-edit]');
-
-    if (editButton) {
-      const request = findMyPrayerById(editButton.dataset.myPrayerEdit);
-
-      if (request) {
-        openPrayerEditModal(request);
-      }
-
-      return;
-    }
-
-    const closeButton = event.target.closest('[data-my-prayer-close]');
-
-    if (closeButton) {
-      const request = findMyPrayerById(closeButton.dataset.myPrayerClose);
-
-      if (!request) {
-        return;
-      }
-
-      openConfirmModal({
-        title: '收回代禱',
-        heading: '確定要收回這項代禱？',
-        description: '收回後，其他人就不會再看到這項代禱。',
-        confirmText: '確認收回',
-        handler: () => closePrayerRequest(request.requestId)
-      });
-
-      return;
-    }
-
-    const button = event.target.closest('[data-my-prayer-open]');
-
-    if (!button) {
-      return;
-    }
-
-    openMyPrayerDetail(button.dataset.myPrayerOpen);
-  }
-
-  function findMyPrayerById(requestId) {
-    const target = String(requestId || '');
-
-    return (state.myPrayerItems || []).find((item) => {
-      return String(item.requestId || '') === target;
-    }) || null;
-  }
-
-  function openPrayerDetail(requestId) {
-    const cachedRequest = findPrayerById(requestId);
-
-    if (!cachedRequest) {
-      return;
-    }
-
-    state.selectedPrayer = cachedRequest;
-    $('#prayerDetailContent').innerHTML =
-      '<div class="empty-card">讀取代禱內容中...</div>';
-    $('#prayerDetailActions').innerHTML = '';
-    setResultMessage('#prayerDetailMessage', '', false);
-    openModal('prayerDetailModal');
-
-    callServer('getPrayerRequestDetail', {
-      playerId: state.currentPlayer.playerId,
-      requestId: requestId
-    })
-      .then((res) => {
-        const request = isSuccess(res) && res.data && res.data.request
-          ? res.data.request
-          : cachedRequest;
-
-        state.selectedPrayer = request;
-        $('#prayerDetailContent').innerHTML =
-          renderPrayerDetailHtml(request);
-
-        if (!isSuccess(res)) {
-          setResultMessage(
-            '#prayerDetailMessage',
-            getResponseError(res, '讀取代禱內容失敗')
-          );
-        }
-
-        renderPrayerDetailActions(request);
-      })
-      .catch((error) => {
-        $('#prayerDetailContent').innerHTML =
-          renderPrayerDetailHtml(cachedRequest);
-        setResultMessage('#prayerDetailMessage', getErrorMessage(error));
-        renderPrayerDetailActions(cachedRequest);
-      });
-  }
-
-  function renderPrayerDetailActions(request) {
-    const actions = [];
-
-    if (request.canRespond) {
-      actions.push(
-        '<button class="ghost-btn" type="button" data-prayer-action="respond">' +
-        '我會為你代禱' +
-        '</button>'
-      );
-    } else if (request.hasWillPrayResponse) {
-      actions.push(
-        '<button class="ghost-btn is-done" type="button" disabled>已代禱</button>'
-      );
-    }
-
-    if (!actions.length) {
-      actions.push(
-        '<div class="empty-card">目前沒有可執行的動作</div>'
-      );
-    }
-
-    $('#prayerDetailActions').innerHTML = actions.join('');
-  }
-
-  function openPrayerDetailCached_(requestId) {
-    const request = findPrayerById(requestId);
-
-    if (!request) {
-      return;
-    }
-
-    state.selectedPrayer = request;
-
-    $('#prayerDetailContent').innerHTML =
-      renderPrayerDetailHtml(request);
-
-    const actions = [];
-
-    if (request.canRespond) {
-      actions.push(
-        '<button class="ghost-btn" type="button" data-prayer-action="respond">' +
-        '我會為你代禱' +
-        '</button>'
-      );
-    } else if (request.hasWillPrayResponse) {
-      actions.push(
-        '<button class="ghost-btn is-done" type="button" disabled>已代禱</button>'
-      );
-    }
-
-    if (!actions.length) {
-      actions.push(
-        '<div class="empty-card">目前沒有可進行的代禱操作。</div>'
-      );
-    }
-
-    $('#prayerDetailActions').innerHTML = actions.join('');
-
-    setResultMessage('#prayerDetailMessage', '', false);
-
-    openModal('prayerDetailModal');
-  }
-
-  function renderPrayerDetailHtml(request) {
-    return [
-      '<section class="prayer-detail-card">',
-      '<div class="prayer-detail-field">',
-      '<span>主題</span>',
-      '<strong>' + escapeHtml(request.title || '') + '</strong>',
-      '</div>',
-      '<div class="prayer-detail-field">',
-      '<span>發起者</span>',
-      '<strong>' +
-        escapeHtml(request.ownerDisplayName || '同伴') +
-      '</strong>',
-      '</div>',
-      request.groupName
-        ? '<div class="prayer-detail-field"><span>活力組</span><strong>' +
-            escapeHtml(request.groupName || '') +
-          '</strong></div>'
-        : '',
-      '<div class="prayer-detail-field prayer-detail-body">',
-      '<span>內容</span>',
-      '<p>' + escapeHtml(request.content || '') + '</p>',
-      '</div>',
-      '<div class="prayer-detail-meta">',
-      '<span class="info-chip">已代禱 ' +
-        Number(request.responseCount || 0) +
-        ' 人</span>',
-      '</div>',
-      '</section>'
-    ].join('');
-  }
-
-  function handlePrayerDetailAction(event) {
-    const button = event.target.closest('[data-prayer-action]');
-
-    if (!button || !state.selectedPrayer) {
-      return;
-    }
-
-    const requestId = state.selectedPrayer.requestId;
-
-    if (button.dataset.prayerAction === 'respond') {
-      openConfirmModal({
-        title: '代禱',
-        heading: '我會為你代禱',
-        description: '確定要為這件事代禱嗎？',
-        confirmText: '確認代禱',
-        handler: () => respondPrayerRequest(requestId)
-      });
-    }
-
-  }
-
-  function respondPrayerRequest(requestId) {
-    if (!ensureGroupFeatureReady('#prayerDetailMessage')) {
-      return;
-    }
-
-    setLoading(true, '送出代禱...');
-
-    const responsePayload = {
-      requestId: requestId,
-      responderId: state.currentPlayer.playerId
-    };
-    const pendingResponse = beginPendingMutationRequest_(
-      'prayer-response:' + requestId, responsePayload
-    );
-    state.pendingPrayerResponseRequestIds[requestId] = pendingResponse.requestId;
-    responsePayload.submissionRequestId = pendingResponse.requestId;
-    callServer('respondPrayerRequest', responsePayload)
-      .then((res) => {
-        if (settlePendingMutationRequest_(
-            'prayer-response:' + requestId, pendingResponse.requestId, res)) {
-          delete state.pendingPrayerResponseRequestIds[requestId];
-        }
-        handlePrayerRespondResult(res, '代禱完成');
-      })
-      .catch((error) => {
-        setResultMessage('#prayerDetailMessage', getErrorMessage(error));
-      })
-      .finally(() => {
-        setLoading(false);
-      });
-  }
-
-  function handlePrayerActionResult(res, fallback) {
-    if (!isSuccess(res)) {
-      setResultMessage(
-        '#prayerDetailMessage',
-        getResponseError(res, fallback + '失敗')
-      );
-      return;
-    }
-
-    closeModal('prayerDetailModal');
-
-    invalidateByRule_('prayerResponseChanged');
-    loadPrayerPage(false);
-    refreshDashboard(false);
-  }
-
-  function handlePrayerRespondResult(res, fallback) {
-    if (!isSuccess(res)) {
-      setResultMessage(
-        '#prayerDetailMessage',
-        getResponseError(res, fallback + '失敗')
-      );
-      return;
-    }
-
-    if (state.selectedPrayer) {
-      state.selectedPrayer = Object.assign({}, state.selectedPrayer, {
-        canRespond: false,
-        hasWillPrayResponse: true,
-        responseCount: Number(state.selectedPrayer.responseCount || 0) + 1
-      });
-      $('#prayerDetailContent').innerHTML =
-        renderPrayerDetailHtml(state.selectedPrayer);
-      renderPrayerDetailActions(state.selectedPrayer);
-    }
-
-    setResultMessage('#prayerDetailMessage', '', false);
-    invalidateByRule_('prayerResponseChanged');
-    loadPrayerPage(false);
-    refreshDashboard(false);
-  }
-
-  function openMyPrayerDetail(requestId) {
-    setLoading(true, '讀取代禱管理資料...');
-
-    callServer('getMyPrayerRequestDetail', {
-      playerId: state.currentPlayer.playerId,
-      requestId: requestId
-    })
-      .then((res) => {
-        if (!isSuccess(res)) {
-          setResultMessage(
-            '#myPrayerDetailMessage',
-            getResponseError(res, '讀取失敗')
-          );
-          return;
-        }
-
-        state.selectedMyPrayerDetail = res.data;
-
-        renderMyPrayerDetail(res.data);
-        openModal('myPrayerDetailModal');
-      })
-      .catch((error) => {
-        setResultMessage('#myPrayerDetailMessage', getErrorMessage(error));
-      })
-      .finally(() => {
-        setLoading(false);
-      });
-  }
-
-  function renderMyPrayerDetail(data) {
-    const request = data.request || {};
-
-    const responses = Array.isArray(data.responses) ? data.responses : [];
-    const responseCount = Number(
-      data.responseSummary && data.responseSummary.responseCount || responses.length || 0
-    );
-    const responseHtml = responses.length
-      ? responses.map((response) => [
-          '<article class="my-prayer-row">',
-          '<span class="my-prayer-date">' + escapeHtml(response.createdAt || response.prayerDate || '') + '</span>',
-          '<strong class="my-prayer-title">' + escapeHtml(response.responderName || '未知玩家') + '</strong>',
-          '<span class="my-prayer-count">' + escapeHtml(response.responderGroupName || '未分組') + '</span>',
-          '</article>'
-        ].join('')).join('')
-      : '<div class="empty-card">目前尚無人回應代禱</div>';
-
-    $('#myPrayerDetailContent').innerHTML = [
-      renderPrayerDetailHtml(request),
-      '<section class="prayer-detail-card">',
-      '<div class="prayer-detail-field"><span>代禱回應</span><strong>共 ' + responseCount + ' 人</strong></div>',
-      '<div class="modal-list">' + responseHtml + '</div>',
-      '</section>'
-    ].join('');
-
-    const actions = [];
-
-    if (request.canEdit) {
-      actions.push(
-        '<button class="ghost-btn" type="button" data-my-prayer-action="edit">' +
-        '編輯代禱內容' +
-        '</button>'
-      );
-    }
-
-    if (request.canClose) {
-      actions.push(
-        '<button class="primary-btn" type="button" data-my-prayer-action="close">' +
-        '關閉代禱事項' +
-        '</button>'
-      );
-    }
-
-    if (!actions.length) {
-      actions.push(
-        '<div class="empty-card">此事項目前沒有可管理的操作。</div>'
-      );
-    }
-
-    $('#myPrayerDetailActions').innerHTML = actions.join('');
-    setResultMessage('#myPrayerDetailMessage', '', false);
-  }
-
-  function handleMyPrayerDetailAction(event) {
-    const button = event.target.closest('[data-my-prayer-action]');
-    const detail = state.selectedMyPrayerDetail;
-
-    if (!button || !detail || !detail.request) {
-      return;
-    }
-
-    const request = detail.request;
-    const action = button.dataset.myPrayerAction;
-
-    if (action === 'edit') {
-      openPrayerEditModal(request);
-    }
-
-    if (action === 'close') {
-      openConfirmModal({
-        title: '關閉代禱事項',
-        heading: '確定要關閉這筆代禱事項嗎？',
-        description: '關閉後將不再接受新的代禱。',
-        confirmText: '確認關閉',
-        handler: () => closePrayerRequest(request.requestId)
-      });
-    }
-  }
-
-  function openPrayerEditModal(request) {
-    state.selectedPrayerForEdit = request;
-
-    $('#prayerEditTitle').value = request.title || '';
-    $('#prayerEditContent').value = request.content || '';
-    $('#prayerEditVisibility').value =
-      ['group', 'public'].includes(request.visibility)
-        ? request.visibility
-        : 'group';
-
-    setResultMessage('#prayerEditMessage', '', false);
-    openModal('prayerEditModal');
-  }
-
-  function submitPrayerEdit(event) {
-    event.preventDefault();
-
-    const request = state.selectedPrayerForEdit;
-
-    if (!request) {
-      return;
-    }
-
-    const payload = {
-      playerId: state.currentPlayer.playerId,
-      requestId: request.requestId,
-      title: $('#prayerEditTitle').value.trim(),
-      content: $('#prayerEditContent').value.trim(),
-      visibility: $('#prayerEditVisibility').value
-    };
-
-    if (!payload.title || !payload.content) {
-      setResultMessage(
-        '#prayerEditMessage',
-        !payload.title
-          ? '請輸入代禱主題'
-          : '請輸入代禱內容'
-      );
-      return;
-    }
-
-    if (payload.title.length > 10) {
-      setResultMessage('#prayerEditMessage', '代禱主題最多 10 個字');
-      return;
-    }
-
-    if (payload.content.length > 100) {
-      setResultMessage('#prayerEditMessage', '代禱內容最多 100 個字');
-      return;
-    }
-
-    setLoading(true, '儲存代禱內容...');
-
-    callServer('updatePrayerRequest', payload)
-      .then((res) => {
-        if (!isSuccess(res)) {
-          setResultMessage(
-            '#prayerEditMessage',
-            getResponseError(res, '儲存失敗')
-          );
-          return;
-        }
-
-        closeModal('prayerEditModal');
-        invalidateByRule_('prayerContentChanged');
-        openMyPrayerDetail(request.requestId);
-        loadMyPrayerRequests();
-        loadPrayerPage(false);
-      })
-      .catch((error) => {
-        setResultMessage('#prayerEditMessage', getErrorMessage(error));
-      })
-      .finally(() => {
-        setLoading(false);
-      });
-  }
-
-  function closePrayerRequest(requestId) {
-    setLoading(true, '關閉代禱事項...');
-
-    callServer('closePrayerRequest', {
-      requestId: requestId,
-      playerId: state.currentPlayer.playerId
-    })
-      .then((res) => {
-        if (!isSuccess(res)) {
-          setResultMessage(
-            '#myPrayerDetailMessage',
-            getResponseError(res, '關閉失敗')
-          );
-          return;
-        }
-
-        closeModal('myPrayerDetailModal');
-
-        invalidateByRule_('prayerContentChanged');
-        loadMyPrayerRequests();
-        loadPrayerPage(false);
-      })
-      .catch((error) => {
-        setResultMessage('#myPrayerDetailMessage', getErrorMessage(error));
-      })
-      .finally(() => {
-        setLoading(false);
-      });
-  }
-
-  function findPrayerById(requestId) {
-    const target = String(requestId || '');
-
-    return []
-      .concat(
-        state.homePrayerItems,
-        state.prayerCarouselItems,
-        state.explorePrayerItems,
-        state.myPrayerItems
-      )
-      .find((item) => {
-        return String(item.requestId || '') === target;
-      }) || null;
-  }
-
   function refreshMyPage() {
     if (isCacheValid_('accountProfile') && isCacheValid_('journey')) {
       const profileData = getCache_('accountProfile') || {};
@@ -7461,17 +6276,13 @@ function clearPrayerAutoScroll(selector) {
     state.pendingWeeklyRequestId = '';
     state.pendingTaskScorePreviews = {};
     state.pendingTaskScoreBaseline = { personalPoints: 0, groupPoints: 0 };
-    state.pendingPrayerResponseRequestIds = {};
     state.pendingGroupCreateRequestId = '';
     state.pendingGroupCreateSignature = '';
     state.pendingGroupPostCreateRequestId = '';
     state.pendingGroupPostCreateSignature = '';
-    state.pendingPrayerCreateRequestId = '';
-    state.pendingPrayerCreateSignature = '';
     state.dailyRecord = null;
     state.weeklyTaskRecord = null;
     state.groupJourney = null;
-    state.homePrayerItems = [];
     state.homeGroupPosts = [];
     state.myGroupPost = null;
     state.homeGroupMemberCount = 0;
@@ -7490,9 +6301,6 @@ function clearPrayerAutoScroll(selector) {
       state.messageCenterSuppressionRetryTimer = null;
     }
     renderHomeMessageBadge_();
-    state.prayerCarouselItems = [];
-    state.explorePrayerItems = [];
-    state.myPrayerItems = [];
     clearAllAppCache_();
     clearPendingMutationRequestsForPlayer_(previousPlayerId);
     clearMessageSuppressionRetryForPlayer_(previousPlayerId);
@@ -8217,22 +7025,6 @@ function clearPrayerAutoScroll(selector) {
         'chestCollection',
         'chestSettingsForPlayer',
         'accountProfile'
-      ],
-      prayerContentChanged: [
-        'prayerList',
-        'myPrayers'
-      ],
-      prayerResponseChanged: [
-        'prayerList',
-        'dashboard',
-        'accountProfile',
-        'growth',
-        'journey',
-        'contribution',
-        'groupJourneyList',
-        'chestSummary',
-        'chestCollection',
-        'chestSettingsForPlayer'
       ],
       groupAnnouncementsChanged: [
         'groupAnnouncements',

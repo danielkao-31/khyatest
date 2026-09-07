@@ -324,16 +324,11 @@
             <div>
               <span class="section-kicker">旅程入口</span>
               <h2>今天的同行</h2>
-              <p>守望交通與個人足跡。</p>
+              <p>個人足跡與同行紀錄。</p>
             </div>
           </div>
 
           <div class="gateway-grid">
-            <button id="goPrayerBtn" class="gateway-card prayer-gateway" type="button">
-              <img src="data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80'%3E%3C/svg%3E" data-managed-url="../UI/icon-prayer-link.png" data-image-key="iconPrayerLink" alt="">
-              <strong>代禱交通</strong>
-              <span id="gatewayPrayerText">守望同伴</span>
-            </button>
 
             <button id="goMyBtn" class="gateway-card journey-gateway" type="button">
               <img src="data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80'%3E%3C/svg%3E" data-managed-url="../UI/icon-growth.png" data-image-key="iconGrowth" alt="">
@@ -345,49 +340,6 @@
 
         <div id="homeMessage" class="result-box hidden"></div>
       </section>
-
-      <!-- 代禱交通 -->
-      <section id="prayerView" class="view-screen hidden">
-        <header class="sub-header">
-          <button class="back-view-btn" data-view="home" type="button">‹</button>
-
-          <div>
-            <h1>代禱交通</h1>
-          </div>
-
-          <button id="refreshPrayerBtn" class="header-action-btn" type="button">更新</button>
-        </header>
-
-        <section class="prayer-entry-grid">
-          <button id="openPrayerCreateBtn" class="prayer-entry-card" type="button">
-            <strong>發起代禱</strong>
-          </button>
-
-          <button id="openPrayerMineBtn" class="prayer-entry-card" type="button">
-            <strong>管理項目</strong>
-          </button>
-        </section>
-
-        <section class="prayer-carousel-section">
-          <div class="section-heading">
-            <div>
-              <span class="section-kicker"></span>
-              <h2>代禱牆</h2>
-              <p id="prayerCarouselStatusText"></p>
-            </div>
-            <button id="openPrayerExploreBtn" class="section-link-btn" type="button">
-              查看全部
-            </button>
-          </div>
-
-          <div id="prayerCarousel" class="prayer-carousel">
-            <div class="empty-card">讀取代禱事項中...</div>
-          </div>
-        </section>
-
-        <div id="prayerMessage" class="result-box hidden"></div>
-      </section>
-
       <!-- 我的 -->
       <section id="myView" class="view-screen hidden">
         <header class="sub-header">
@@ -447,7 +399,6 @@
 
     <nav id="bottomNav" class="bottom-nav hidden">
       <button id="navHomeBtn" type="button"><span>⌂</span>首頁</button>
-      <button id="navPrayerBtn" type="button"><span>♡</span>代禱</button>
       <button id="navMyBtn" type="button"><span>◎</span>我的</button>
     </nav>
   </div>
@@ -758,172 +709,6 @@
       <div id="weeklyTaskModalMessage" class="result-box hidden"></div>
     </div>
   </div>
-
-  <!-- 發出代禱 -->
-  <div id="prayerCreateModal" class="modal-layer hidden" role="dialog" aria-modal="true">
-    <div class="modal-card large-modal-card">
-      <div class="modal-header">
-        <button class="modal-close-btn" data-close-modal="prayerCreateModal" type="button">‹</button>
-        <h2>發出代禱</h2>
-        <span></span>
-      </div>
-
-      <form id="prayerCreateForm" class="form-stack">
-        <label class="field-label">
-          代禱標題
-          <input id="prayerTitle" type="text" maxlength="10" placeholder="最多 10 個字">
-        </label>
-
-        <label class="field-label">
-          代禱內容
-          <textarea id="prayerContent" rows="6" maxlength="100" placeholder="最多 100 個字"></textarea>
-        </label>
-
-        <label class="field-label">
-          可見範圍
-          <select id="prayerVisibility">
-            <option value="group">同活力組可見</option>
-            <option value="public">所有人可見</option>
-          </select>
-        </label>
-
-        <button class="primary-btn" type="submit">送出代禱事項</button>
-      </form>
-
-      <div id="prayerCreateMessage" class="result-box hidden"></div>
-    </div>
-  </div>
-
-  <!-- 為人代禱：搜尋 -->
-      <div id="prayerExploreModal" class="modal-layer hidden" role="dialog" aria-modal="true">
-    <div class="modal-card wide-modal-card">
-      <div class="modal-header">
-        <button class="modal-close-btn" data-close-modal="prayerExploreModal" type="button">‹</button>
-        <h2>為人代禱</h2>
-        <span></span>
-      </div>
-
-      <div class="prayer-search-grid compact-filter-bar">
-        <label class="field-label">
-          發出者搜尋
-          <input id="prayerOwnerKeyword" type="search" placeholder="姓名">
-        </label>
-
-        <label class="field-label">
-          內容搜尋
-          <input id="prayerKeyword" type="search" placeholder="標題或內容">
-        </label>
-
-        <label class="field-label">
-          可見範圍
-          <select id="prayerVisibilityFilter">
-            <option value="all">全部可見事項</option>
-            <option value="group">同活力組</option>
-            <option value="public">所有人可見</option>
-          </select>
-        </label>
-
-        <label class="field-label">
-          排序
-          <select id="prayerSortMode">
-            <option value="groupFirst">同活力組優先</option>
-            <option value="latest">最新發出</option>
-          </select>
-        </label>
-
-        <button id="searchPrayerBtn" class="primary-btn" type="button">搜尋</button>
-      </div>
-
-      <p id="prayerExploreMeta" class="modal-meta-text"></p>
-
-      <div id="prayerExploreList" class="modal-list">
-        <div class="empty-card">讀取代禱事項中...</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- 我的代禱 -->
-  <div id="myPrayerModal" class="modal-layer hidden" role="dialog" aria-modal="true">
-    <div class="modal-card wide-modal-card">
-      <div class="modal-header">
-        <button class="modal-close-btn" data-close-modal="myPrayerModal" type="button">‹</button>
-        <h2>我的代禱</h2>
-        <span></span>
-      </div>
-
-      <p id="myPrayerMeta" class="modal-meta-text"></p>
-
-      <div id="myPrayerList" class="modal-list">
-        <div class="empty-card">讀取中...</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- 代禱詳情 -->
-  <div id="prayerDetailModal" class="modal-layer hidden" role="dialog" aria-modal="true">
-    <div class="modal-card large-modal-card">
-      <div class="modal-header">
-        <button class="modal-close-btn" data-close-modal="prayerDetailModal" type="button">‹</button>
-        <h2>代禱事項</h2>
-        <span></span>
-      </div>
-
-      <section id="prayerDetailContent" class="prayer-detail-content"></section>
-      <div id="prayerDetailActions" class="modal-action-stack"></div>
-      <div id="prayerDetailMessage" class="result-box hidden"></div>
-    </div>
-  </div>
-
-  <!-- 我的代禱管理詳情 -->
-  <div id="myPrayerDetailModal" class="modal-layer hidden" role="dialog" aria-modal="true">
-    <div class="modal-card wide-modal-card">
-      <div class="modal-header">
-        <button class="modal-close-btn" data-close-modal="myPrayerDetailModal" type="button">‹</button>
-        <h2>代禱管理</h2>
-        <span></span>
-      </div>
-
-      <div id="myPrayerDetailContent" class="prayer-detail-content"></div>
-      <div id="myPrayerDetailActions" class="modal-action-stack"></div>
-      <div id="myPrayerDetailMessage" class="result-box hidden"></div>
-    </div>
-  </div>
-
-  <!-- 編輯代禱 -->
-  <div id="prayerEditModal" class="modal-layer hidden" role="dialog" aria-modal="true">
-    <div class="modal-card large-modal-card">
-      <div class="modal-header">
-        <button class="modal-close-btn" data-close-modal="prayerEditModal" type="button">‹</button>
-        <h2>編輯代禱內容</h2>
-        <span></span>
-      </div>
-
-      <form id="prayerEditForm" class="form-stack">
-        <label class="field-label">
-          主題
-          <input id="prayerEditTitle" type="text" maxlength="10">
-        </label>
-
-        <label class="field-label">
-          內容
-          <textarea id="prayerEditContent" rows="6" maxlength="100"></textarea>
-        </label>
-
-        <label class="field-label">
-          可見範圍
-          <select id="prayerEditVisibility">
-            <option value="group">同活力組可見</option>
-            <option value="public">所有人可見</option>
-          </select>
-        </label>
-
-        <button class="primary-btn" type="submit">儲存修改</button>
-      </form>
-
-      <div id="prayerEditMessage" class="result-box hidden"></div>
-    </div>
-  </div>
-
   <!-- 確認 -->
   <div id="confirmModal" class="modal-layer hidden" role="dialog" aria-modal="true">
     <div class="modal-card confirm-modal-card">
