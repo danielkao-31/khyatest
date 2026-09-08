@@ -3119,12 +3119,12 @@ body[data-theme="night"] .auth-hero{
     z-index:20;
     transform:translateX(-50%);
     display:grid;
-    grid-template-columns:repeat(3,minmax(0,1fr));
-    gap:4px;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:10px;
     backdrop-filter:blur(12px);
     left:50%;
     width:min(calc(100vw - 12px),760px);
-    padding:7px 8px calc(7px + env(safe-area-inset-bottom));
+    padding:9px 12px calc(9px + env(safe-area-inset-bottom));
     border:3px solid var(--cute-line);
     border-bottom:0;
     border-radius:24px 24px 0 0;
@@ -3132,11 +3132,71 @@ body[data-theme="night"] .auth-hero{
     box-shadow:0 -5px 0 rgba(199,155,136,.55),0 -12px 22px rgba(70,54,48,.14);
 }
 
+.bottom-nav button{
+  min-height:64px;
+    border:2px solid rgba(184,151,140,.44);
+    border-radius:20px;
+    background:linear-gradient(180deg,rgba(255,255,255,.96),rgba(250,247,239,.96));
+    color:#596b76;
+    font-size:14px;
+    font-weight:900;
+    line-height:1.15;
+    letter-spacing:.04em;
+    gap:4px;
+    box-shadow:0 3px 0 rgba(187,151,139,.20),0 5px 12px rgba(70,54,48,.08);
+    transition:transform .16s ease,box-shadow .16s ease,background .16s ease,border-color .16s ease,color .16s ease;
+}
+
+.bottom-nav button span{
+  display:grid;
+    place-items:center;
+    width:30px;
+    height:30px;
+    border-radius:999px;
+    font-size:23px;
+    line-height:1;
+    color:#667985;
+    background:rgba(111,158,180,.10);
+    box-shadow:inset 0 0 0 1px rgba(111,158,180,.16);
+}
+
 .bottom-nav button.active{
-  font-weight:900;
-    color:#a05067;
-    background:linear-gradient(180deg,#fff1f6,#ffe1e9);
-    box-shadow:0 3px 0 #e5b2bd inset;
+  transform:translateY(-2px);
+    font-weight:900;
+    color:#944b63;
+    border-color:#e0a8b7;
+    background:linear-gradient(180deg,#fff4f8,#ffdce7);
+    box-shadow:0 4px 0 #d896a8,0 8px 16px rgba(160,80,103,.18);
+}
+
+.bottom-nav button.active span{
+  color:#9f5068;
+    background:#fff8fb;
+    box-shadow:inset 0 0 0 2px rgba(208,128,151,.26),0 2px 5px rgba(160,80,103,.14);
+}
+
+.bottom-nav button:active{
+  transform:translateY(1px);
+    box-shadow:0 2px 0 rgba(187,151,139,.20),0 3px 8px rgba(70,54,48,.08);
+}
+
+@media (max-width:420px){
+  .bottom-nav{
+    gap:8px;
+    padding-left:10px;
+    padding-right:10px;
+  }
+
+  .bottom-nav button{
+    min-height:60px;
+    font-size:13px;
+  }
+
+  .bottom-nav button span{
+    width:28px;
+    height:28px;
+    font-size:21px;
+  }
 }
 
 body{
