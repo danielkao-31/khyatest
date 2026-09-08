@@ -5087,14 +5087,14 @@ const STORAGE_KEY = 'yct_current_player';
       const status = $(homeStatus);
 
       if (status) {
-        status.textContent = done ? '已完成' : (pending ? '處理中' : '未完成');
+        status.textContent = done ? '已完成' : '未完成';
       }
 
       const homeButton = $('.quest-card[data-practice="' + type + '"]');
 
       if (homeButton) {
         homeButton.classList.toggle('done', done);
-        homeButton.classList.toggle('is-pending', pending);
+        homeButton.classList.remove('is-pending');
         homeButton.disabled = pending;
       }
     });
@@ -5144,11 +5144,9 @@ const STORAGE_KEY = 'yct_current_player';
     $('#practiceModalDescription').textContent = config.description;
     $('#practiceModalReward').textContent = config.reward;
 
-    $('#practiceSubmitBtn').textContent = pending
-      ? '處理中'
-      : (done
-          ? (TASK_PERFORMANCE_PROBE_ENABLED ? '防重測速' : '今日已完成')
-          : '確認完成');
+    $('#practiceSubmitBtn').textContent = done
+      ? (TASK_PERFORMANCE_PROBE_ENABLED ? '防重測速' : '今日已完成')
+      : '確認完成';
 
     $('#practiceSubmitBtn').disabled = pending ||
       (done && !TASK_PERFORMANCE_PROBE_ENABLED);
@@ -5199,7 +5197,6 @@ const STORAGE_KEY = 'yct_current_player';
     if (!directHome) {
       const submitBtn = $('#practiceSubmitBtn');
       if (submitBtn) {
-        submitBtn.textContent = '處理中';
         submitBtn.disabled = true;
       }
     }
@@ -5348,12 +5345,12 @@ const STORAGE_KEY = 'yct_current_player';
         (button ? button.querySelector('em') : null);
 
       if (status) {
-        status.textContent = done ? '已完成' : (pending ? '處理中' : '未完成');
+        status.textContent = done ? '已完成' : '未完成';
       }
 
       if (button) {
         button.classList.toggle('done', done);
-        button.classList.toggle('is-pending', pending);
+        button.classList.remove('is-pending');
         button.disabled = pending;
       }
     });
@@ -5410,11 +5407,9 @@ const STORAGE_KEY = 'yct_current_player';
     $('#weeklyTaskModalDescription').textContent = config.description;
     $('#weeklyTaskModalReward').textContent = config.reward;
 
-    $('#weeklyTaskSubmitBtn').textContent = pending
-      ? '處理中'
-      : (done
-          ? (TASK_PERFORMANCE_PROBE_ENABLED ? '防重測速' : '本週已完成')
-          : '確認完成');
+    $('#weeklyTaskSubmitBtn').textContent = done
+      ? (TASK_PERFORMANCE_PROBE_ENABLED ? '防重測速' : '本週已完成')
+      : '確認完成';
 
     $('#weeklyTaskSubmitBtn').disabled = pending ||
       (done && !TASK_PERFORMANCE_PROBE_ENABLED);
@@ -5467,7 +5462,6 @@ const STORAGE_KEY = 'yct_current_player';
     if (!directHome) {
       const submitBtn = $('#weeklyTaskSubmitBtn');
       if (submitBtn) {
-        submitBtn.textContent = '處理中';
         submitBtn.disabled = true;
       }
     }
