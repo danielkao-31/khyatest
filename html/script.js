@@ -117,34 +117,11 @@ const STORAGE_KEY = 'yct_current_player';
     }
   })();
 
-  function formatTaskPerformanceMessage_(performance, clientStartedAt) {
-    const clientSeconds = Math.max(
-      0,
-      Date.now() - Number(clientStartedAt || Date.now())
-    ) / 1000;
-    const backendSeconds = Number(
-      performance && performance.totalMilliseconds || 0
-    ) / 1000;
-    const stages = performance && performance.stages || {};
-    const rankedStages = Object.keys(stages).map((stageName) => ({
-      name: stageName,
-      milliseconds: Number(stages[stageName] || 0)
-    })).filter((stage) => stage.milliseconds > 0)
-      .sort((left, right) => right.milliseconds - left.milliseconds);
-    const version = String(
-      performance && performance.releaseVersion || '後端版本未知'
-    );
-    const stageText = rankedStages.length
-      ? '；階段 ' + rankedStages.slice(0, 5).map((stage) =>
-          stage.name + ' ' + (stage.milliseconds / 1000).toFixed(1) + ' 秒'
-        ).join('、')
-      : '';
-    return '任務已儲存（' + version + '；總計 ' +
-      clientSeconds.toFixed(1) + ' 秒；後端 ' +
-      backendSeconds.toFixed(1) + ' 秒' + stageText + '）';
+  function formatTaskPerformanceMessage_() {
+    return '任務已儲存';
   }
-  function formatTaskQueueAcceptedMessage_(performance, clientStartedAt) {
-    return formatTaskPerformanceMessage_(performance, clientStartedAt);
+  function formatTaskQueueAcceptedMessage_() {
+    return '任務已送出';
   }
 
   function getOfficialHomeScoreSnapshot_() {
@@ -505,16 +482,6 @@ const STORAGE_KEY = 'yct_current_player';
             applyCompletedTaskWriteResult_(kind, data.result);
             rebasePendingTaskScorePreview_();
             notifyOtherAppInstances_('taskWriteCompleted');
-            if (TASK_PERFORMANCE_PROBE_ENABLED && data.result.performance) {
-              const detail = (Number(
-                data.result.performance.totalMilliseconds || 0
-              ) / 1000).toFixed(1);
-              setResultMessage(
-                '#homeMessage',
-                '任務處理完成（後端 ' + detail + ' 秒）',
-                true
-              );
-            }
             finishTaskWriteSyncTracking_(eventId);
             return;
           }
