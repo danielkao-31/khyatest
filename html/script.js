@@ -109,6 +109,7 @@ const STORAGE_KEY = 'yct_current_player';
   const HOME_SYNC_RESUME_DEBOUNCE_MS = 1500;
   const SERVER_READ_CALL_TIMEOUT_MS = 90 * 1000;
   const CACHE_LOADING_PROMISE_TTL_MS = SERVER_READ_CALL_TIMEOUT_MS + 5 * 1000;
+  const TASK_SUBMIT_LOADING_VISIBLE_MS = 1000;
   const TASK_PERFORMANCE_PROBE_ENABLED = (() => {
     try {
       return new URLSearchParams(window.location.search).get('taskPerf') === '1';
@@ -274,6 +275,49 @@ const STORAGE_KEY = 'yct_current_player';
       groupPoints: official.groupPoints
     };
     renderPendingTaskScorePreview_();
+  }
+
+  function getTaskUiPendingBucket_(kind) {
+    const key = kind === 'MEETING' ? 'weekly' : 'daily';
+    if (!state.pendingTaskUi || typeof state.pendingTaskUi !== 'object') {
+      state.pendingTaskUi = { daily: {}, weekly: {} };
+    }
+    if (!state.pendingTaskUi[key] || typeof state.pendingTaskUi[key] !== 'object') {
+      state.pendingTaskUi[key] = {};
+    }
+    return state.pendingTaskUi[key];
+  }
+
+  function isTaskUiPending_(kind, taskType) {
+    taskType = String(taskType || '').trim();
+    return !!(taskType && getTaskUiPendingBucket_(kind)[taskType]);
+  }
+
+  function setTaskUiPending_(kind, taskType, pending) {
+    taskType = String(taskType || '').trim();
+    if (!taskType) return;
+    const bucket = getTaskUiPendingBucket_(kind);
+    if (pending) {
+      bucket[taskType] = true;
+    } else {
+      delete bucket[taskType];
+    }
+  }
+
+  function showTaskSubmitLoadingBriefly_(text) {
+    const generation = Number(state.taskSubmitLoadingGeneration || 0) + 1;
+    state.taskSubmitLoadingGeneration = generation;
+
+    if (state.taskSubmitLoadingTimer) {
+      window.clearTimeout(state.taskSubmitLoadingTimer);
+    }
+
+    setLoading(true, text || '儲存任務...');
+    state.taskSubmitLoadingTimer = window.setTimeout(() => {
+      if (Number(state.taskSubmitLoadingGeneration || 0) !== generation) return;
+      state.taskSubmitLoadingTimer = null;
+      setLoading(false);
+    }, TASK_SUBMIT_LOADING_VISIBLE_MS);
   }
 
   function buildClientTaskScorePreview_(kind, taskType) {
@@ -726,6 +770,9 @@ const STORAGE_KEY = 'yct_current_player';
     selectedWeeklyTaskType: '',
     pendingDailyRequestId: '',
     pendingWeeklyRequestId: '',
+    pendingTaskUi: { daily: {}, weekly: {} },
+    taskSubmitLoadingTimer: null,
+    taskSubmitLoadingGeneration: 0,
     taskWriteSyncInFlight: {},
     pendingTaskScorePreviews: {},
     pendingTaskScoreBaseline: {
@@ -5036,16 +5083,19 @@ const STORAGE_KEY = 'yct_current_player';
 
     tasks.forEach(([type, value, homeStatus]) => {
       const done = toBool(value);
+      const pending = !done && isTaskUiPending_('DAILY', type);
       const status = $(homeStatus);
 
       if (status) {
-        status.textContent = done ? '已完成' : '未完成';
+        status.textContent = done ? '已完成' : (pending ? '處理中' : '未完成');
       }
 
       const homeButton = $('.quest-card[data-practice="' + type + '"]');
 
       if (homeButton) {
         homeButton.classList.toggle('done', done);
+        homeButton.classList.toggle('is-pending', pending);
+        homeButton.disabled = pending;
       }
     });
   }
@@ -5053,7 +5103,7 @@ const STORAGE_KEY = 'yct_current_player';
   function submitHomePracticeDirect_(type) {
     const config = PRACTICE_CONFIG[type];
 
-    if (!config) {
+    if (!config || isTaskUiPending_('DAILY', type)) {
       return;
     }
 
@@ -5086,6 +5136,7 @@ const STORAGE_KEY = 'yct_current_player';
 
     const dailyRecord = state.dailyRecord || {};
     const done = toBool(dailyRecord[config.field]);
+    const pending = !done && isTaskUiPending_('DAILY', type);
 
     state.selectedPracticeType = type;
 
@@ -5093,12 +5144,14 @@ const STORAGE_KEY = 'yct_current_player';
     $('#practiceModalDescription').textContent = config.description;
     $('#practiceModalReward').textContent = config.reward;
 
-    $('#practiceSubmitBtn').textContent = done
-      ? (TASK_PERFORMANCE_PROBE_ENABLED ? '防重測速' : '今日已完成')
-      : '確認完成';
+    $('#practiceSubmitBtn').textContent = pending
+      ? '處理中'
+      : (done
+          ? (TASK_PERFORMANCE_PROBE_ENABLED ? '防重測速' : '今日已完成')
+          : '確認完成');
 
-    $('#practiceSubmitBtn').disabled =
-      done && !TASK_PERFORMANCE_PROBE_ENABLED;
+    $('#practiceSubmitBtn').disabled = pending ||
+      (done && !TASK_PERFORMANCE_PROBE_ENABLED);
 
     setResultMessage(
       '#practiceModalMessage',
@@ -5116,9 +5169,10 @@ const STORAGE_KEY = 'yct_current_player';
   function submitPracticeModal(options) {
     const directHome = !!(options && options.directHome === true);
     const messageTarget = directHome ? '#homeMessage' : '#practiceModalMessage';
-    const config = PRACTICE_CONFIG[state.selectedPracticeType];
+    const taskType = String(state.selectedPracticeType || '').trim();
+    const config = PRACTICE_CONFIG[taskType];
 
-    if (!config || !state.currentPlayer) {
+    if (!config || !state.currentPlayer || isTaskUiPending_('DAILY', taskType)) {
       return;
     }
 
@@ -5139,19 +5193,34 @@ const STORAGE_KEY = 'yct_current_player';
     state.pendingDailyRequestId = pendingDaily.requestId;
     payload.requestId = pendingDaily.requestId;
     const localPreviewKey = 'LOCAL_DAILY::' + payload.requestId;
+
+    setTaskUiPending_('DAILY', taskType, true);
+    renderDailyStatus();
+    if (!directHome) {
+      const submitBtn = $('#practiceSubmitBtn');
+      if (submitBtn) {
+        submitBtn.textContent = '處理中';
+        submitBtn.disabled = true;
+      }
+    }
+
     beginPendingTaskScorePreview_(
       localPreviewKey,
-      buildClientTaskScorePreview_('DAILY', state.selectedPracticeType)
+      buildClientTaskScorePreview_('DAILY', taskType)
     );
 
     const taskRequestStartedAt = Date.now();
-    setLoading(true, '儲存今日任務...');
+    showTaskSubmitLoadingBriefly_('儲存今日任務...');
 
     callServer('submitDailyPractice', payload)
       .then((res) => {
         if (!isSuccess(res)) {
+          setTaskUiPending_('DAILY', taskType, false);
+          state.pendingDailyRequestId = '';
+          renderDailyStatus();
           removePendingTaskScorePreview_(localPreviewKey);
           settlePendingMutationRequest_('daily-practice', payload.requestId, res);
+          if (!directHome) openPracticeModal(taskType);
           setResultMessage(
             messageTarget,
             getResponseError(res, '儲存失敗')
@@ -5173,6 +5242,7 @@ const STORAGE_KEY = 'yct_current_player';
         );
         settlePendingMutationRequest_('daily-practice', payload.requestId, res);
         state.pendingDailyRequestId = '';
+        setTaskUiPending_('DAILY', taskType, false);
         invalidateByRule_('dailyPracticeChanged');
         renderDailyStatus();
         const performanceMessage = res.data.processingPending
@@ -5195,11 +5265,12 @@ const STORAGE_KEY = 'yct_current_player';
         }
       })
       .catch((error) => {
+        setTaskUiPending_('DAILY', taskType, false);
+        state.pendingDailyRequestId = '';
+        renderDailyStatus();
         removePendingTaskScorePreview_(localPreviewKey);
+        if (!directHome) openPracticeModal(taskType);
         setResultMessage(messageTarget, getErrorMessage(error));
-      })
-      .finally(() => {
-        setLoading(false);
       });
   }
 
@@ -5270,17 +5341,20 @@ const STORAGE_KEY = 'yct_current_player';
 
     rows.forEach(([type, value, statusSelector, buttonSelector]) => {
       const done = toBool(value);
+      const pending = !done && isTaskUiPending_('MEETING', type);
       const button = $(buttonSelector) ||
         $('[data-weekly-task="' + type + '"]');
       const status = $(statusSelector) ||
         (button ? button.querySelector('em') : null);
 
       if (status) {
-        status.textContent = done ? '已完成' : '未完成';
+        status.textContent = done ? '已完成' : (pending ? '處理中' : '未完成');
       }
 
       if (button) {
         button.classList.toggle('done', done);
+        button.classList.toggle('is-pending', pending);
+        button.disabled = pending;
       }
     });
 
@@ -5295,7 +5369,7 @@ const STORAGE_KEY = 'yct_current_player';
   function submitHomeWeeklyTaskDirect_(type) {
     const config = WEEKLY_TASK_CONFIG[type];
 
-    if (!config) {
+    if (!config || isTaskUiPending_('MEETING', type)) {
       return;
     }
 
@@ -5328,6 +5402,7 @@ const STORAGE_KEY = 'yct_current_player';
 
     const weeklyRecord = state.weeklyTaskRecord || {};
     const done = toBool(weeklyRecord[config.field]);
+    const pending = !done && isTaskUiPending_('MEETING', type);
 
     state.selectedWeeklyTaskType = type;
 
@@ -5335,12 +5410,14 @@ const STORAGE_KEY = 'yct_current_player';
     $('#weeklyTaskModalDescription').textContent = config.description;
     $('#weeklyTaskModalReward').textContent = config.reward;
 
-    $('#weeklyTaskSubmitBtn').textContent = done
-      ? (TASK_PERFORMANCE_PROBE_ENABLED ? '防重測速' : '本週已完成')
-      : '確認完成';
+    $('#weeklyTaskSubmitBtn').textContent = pending
+      ? '處理中'
+      : (done
+          ? (TASK_PERFORMANCE_PROBE_ENABLED ? '防重測速' : '本週已完成')
+          : '確認完成');
 
-    $('#weeklyTaskSubmitBtn').disabled =
-      done && !TASK_PERFORMANCE_PROBE_ENABLED;
+    $('#weeklyTaskSubmitBtn').disabled = pending ||
+      (done && !TASK_PERFORMANCE_PROBE_ENABLED);
 
     setResultMessage(
       '#weeklyTaskModalMessage',
@@ -5358,9 +5435,10 @@ const STORAGE_KEY = 'yct_current_player';
   function submitWeeklyTaskModal(options) {
     const directHome = !!(options && options.directHome === true);
     const messageTarget = directHome ? '#homeMessage' : '#weeklyTaskModalMessage';
-    const config = WEEKLY_TASK_CONFIG[state.selectedWeeklyTaskType];
+    const taskType = String(state.selectedWeeklyTaskType || '').trim();
+    const config = WEEKLY_TASK_CONFIG[taskType];
 
-    if (!config || !state.currentPlayer) {
+    if (!config || !state.currentPlayer || isTaskUiPending_('MEETING', taskType)) {
       return;
     }
 
@@ -5383,19 +5461,34 @@ const STORAGE_KEY = 'yct_current_player';
     state.pendingWeeklyRequestId = pendingMeeting.requestId;
     payload.requestId = pendingMeeting.requestId;
     const localPreviewKey = 'LOCAL_MEETING::' + payload.requestId;
+
+    setTaskUiPending_('MEETING', taskType, true);
+    renderWeeklyTaskStatus();
+    if (!directHome) {
+      const submitBtn = $('#weeklyTaskSubmitBtn');
+      if (submitBtn) {
+        submitBtn.textContent = '處理中';
+        submitBtn.disabled = true;
+      }
+    }
+
     beginPendingTaskScorePreview_(
       localPreviewKey,
-      buildClientTaskScorePreview_('MEETING', state.selectedWeeklyTaskType)
+      buildClientTaskScorePreview_('MEETING', taskType)
     );
 
     const taskRequestStartedAt = Date.now();
-    setLoading(true, '儲存本週任務...');
+    showTaskSubmitLoadingBriefly_('儲存本週任務...');
 
     callServer('submitMeetingPractice', payload)
       .then((res) => {
         if (!isSuccess(res)) {
+          setTaskUiPending_('MEETING', taskType, false);
+          state.pendingWeeklyRequestId = '';
+          renderWeeklyTaskStatus();
           removePendingTaskScorePreview_(localPreviewKey);
           settlePendingMutationRequest_('meeting-practice', payload.requestId, res);
+          if (!directHome) openWeeklyTaskModal(taskType);
           setResultMessage(
             messageTarget,
             getResponseError(res, '儲存失敗')
@@ -5417,6 +5510,7 @@ const STORAGE_KEY = 'yct_current_player';
         );
         settlePendingMutationRequest_('meeting-practice', payload.requestId, res);
         state.pendingWeeklyRequestId = '';
+        setTaskUiPending_('MEETING', taskType, false);
         invalidateByRule_('meetingPracticeChanged');
         renderWeeklyTaskStatus();
         const performanceMessage = res.data.processingPending
@@ -5439,11 +5533,12 @@ const STORAGE_KEY = 'yct_current_player';
         }
       })
       .catch((error) => {
+        setTaskUiPending_('MEETING', taskType, false);
+        state.pendingWeeklyRequestId = '';
+        renderWeeklyTaskStatus();
         removePendingTaskScorePreview_(localPreviewKey);
+        if (!directHome) openWeeklyTaskModal(taskType);
         setResultMessage(messageTarget, getErrorMessage(error));
-      })
-      .finally(() => {
-        setLoading(false);
       });
   }
 
@@ -6241,6 +6336,12 @@ const STORAGE_KEY = 'yct_current_player';
     state.currentCycleId = '';
     state.pendingDailyRequestId = '';
     state.pendingWeeklyRequestId = '';
+    state.pendingTaskUi = { daily: {}, weekly: {} };
+    if (state.taskSubmitLoadingTimer) {
+      window.clearTimeout(state.taskSubmitLoadingTimer);
+    }
+    state.taskSubmitLoadingTimer = null;
+    state.taskSubmitLoadingGeneration = Number(state.taskSubmitLoadingGeneration || 0) + 1;
     state.pendingTaskScorePreviews = {};
     state.pendingTaskScoreBaseline = { personalPoints: 0, groupPoints: 0 };
     state.pendingGroupCreateRequestId = '';
